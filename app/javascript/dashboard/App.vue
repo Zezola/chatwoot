@@ -5,6 +5,7 @@ import NetworkNotification from './components/NetworkNotification.vue';
 import UpdateBanner from './components/app/UpdateBanner.vue';
 import PaymentPendingBanner from './components/app/PaymentPendingBanner.vue';
 import PendingEmailVerificationBanner from './components/app/PendingEmailVerificationBanner.vue';
+import PushNotificationsBanner from './components/app/PushNotificationsBanner.vue';
 import vueActionCable from './helper/actionCable';
 import { useRouter } from 'vue-router';
 import { useStore } from 'dashboard/composables/store';
@@ -28,6 +29,7 @@ export default {
     NetworkNotification,
     UpdateBanner,
     PaymentPendingBanner,
+    PushNotificationsBanner,
     WootSnackbarBox,
     PendingEmailVerificationBanner,
   },
@@ -51,6 +53,7 @@ export default {
     return {
       latestChatwootVersion: null,
       reconnectService: null,
+      preventInstallPromptHandler: null,
     };
   },
   computed: {
@@ -79,6 +82,11 @@ export default {
   mounted() {
     this.initializeColorTheme();
     this.listenToThemeChanges();
+    this.preventInstallPromptHandler = event => event.preventDefault();
+    window.addEventListener(
+      'beforeinstallprompt',
+      this.preventInstallPromptHandler
+    );
     // If user locale is set, use it; otherwise use account locale
     this.setLocale(
       this.uiSettings?.locale || window.chatwootConfig.selectedLocale
@@ -88,6 +96,11 @@ export default {
     if (this.reconnectService) {
       this.reconnectService.disconnect();
     }
+
+    window.removeEventListener(
+      'beforeinstallprompt',
+      this.preventInstallPromptHandler
+    );
   },
   methods: {
     initializeColorTheme() {
@@ -133,12 +146,17 @@ export default {
     id="app"
     class="flex flex-col w-full h-screen min-h-0"
     :dir="isRTL ? 'rtl' : 'ltr'"
-  > 
+  >
     <!-- TODO: Descomentar isso aqui, só estamos tirando por enquanto pra sumir o botao de update -->
     <!-- <UpdateBanner :latest-chatwoot-version="latestChatwootVersion" /> -->
     <template v-if="currentAccountId">
       <PendingEmailVerificationBanner v-if="hideOnOnboardingView" />
       <PaymentPendingBanner v-if="hideOnOnboardingView" />
+      <PushNotificationsBanner
+        v-if="hideOnOnboardingView"
+        :account-id="currentAccountId"
+        :current-user="currentUser"
+      />
     </template>
     <router-view v-slot="{ Component }">
       <transition name="fade" mode="out-in">

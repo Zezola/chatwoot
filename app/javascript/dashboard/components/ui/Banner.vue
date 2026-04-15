@@ -42,6 +42,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    closeButtonLabel: {
+      type: String,
+      default: '',
+    },
   },
   emits: ['primaryAction', 'close'],
   computed: {
@@ -108,7 +112,7 @@ export default {
         xs
         icon="i-lucide-circle-x"
         :color="getButtonColor"
-        :label="$t('GENERAL_SETTINGS.DISMISS')"
+        :label="closeButtonLabel || $t('GENERAL_SETTINGS.DISMISS')"
         @click="onClickClose"
       />
     </div>

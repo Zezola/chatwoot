@@ -258,6 +258,22 @@
       "MESSAGE_CLOUD": "You are not part of any accounts right now. If you think this is a mistake, please reach out to our support team.",
       "MESSAGE_SELF_HOSTED": "You are not part of any accounts right now. Please reach out to your administrator.",
       "LOGOUT": "Encerrar sessão"
+    },
+    "PUSH_NOTIFICATION_BANNER": {
+      "DEFAULT_MESSAGE": "Ative as notificações para não perder novas conversas e respostas.",
+      "DEFAULT_ACTION": "Ativar notificações",
+      "IOS_MESSAGE": "No iPhone, adicione o Chatwoot à Tela de Início para receber notificações.",
+      "IOS_ACTION": "Como ativar",
+      "DENIED_MESSAGE": "As notificações estão bloqueadas no navegador. Libere nas configurações do navegador para receber avisos.",
+      "DISMISS_ACTION": "Não perguntar mais",
+      "IOS_MODAL": {
+        "TITLE": "Ativar notificações no iPhone",
+        "DESCRIPTION": "Siga estes passos uma vez para continuar recebendo alertas no Chatwoot.",
+        "STEP_1": "Toque em Compartilhar no Safari.",
+        "STEP_2": "Toque em Adicionar à Tela de Início.",
+        "STEP_3": "Abra o Chatwoot pelo novo atalho criado na Tela de Início.",
+        "STEP_4": "Permita as notificações quando o Safari pedir a confirmação."
+      }
     }
   },
   "COMPONENTS": {

@@ -183,15 +183,15 @@
       "MESSAGE_SIGN_TOOLTIP": "Assinatura de mensagem",
       "ENABLE_SIGN_TOOLTIP": "Ativar assinatura",
       "DISABLE_SIGN_TOOLTIP": "Desativar assinatura",
-      "MSG_INPUT": "Shift + enter para nova linha. Digite '/' para selecionar uma Resposta Pronta.",
-      "PRIVATE_MSG_INPUT": "A mensagem será visível apenas para agentes",
+      "MSG_INPUT": "Escreva para o cliente...",
+      "PRIVATE_MSG_INPUT": "Escreva uma nota interna para o time e para a IA...",
       "MESSAGE_SIGNATURE_NOT_CONFIGURED": "A assinatura da mensagem não está configurada. Por favor, configure-a nas configurações do perfil.",
       "CLICK_HERE": "Clique aqui para atualizar",
       "WHATSAPP_TEMPLATES": "Templates do Whatsapp"
     },
     "REPLYBOX": {
-      "REPLY": "Responder",
-      "PRIVATE_NOTE": "Mensagem Privada",
+      "REPLY": "Responder cliente",
+      "PRIVATE_NOTE": "Responder para o time",
       "SEND": "Enviar",
       "CREATE": "Enviar",
       "INSERT_READ_MORE": "Saiba mais",
@@ -228,6 +228,17 @@
           "CANCEL": "Cancelar"
         }
       },
+      "TEMPLATE_ONLY_MODE": {
+        "TITLE": "Agora você só pode iniciar uma nova mensagem com um template aprovado.",
+        "ACTION": "Enviar template"
+      },
+      "PRIVATE_NOTE_CONFIRMATION": {
+        "TITLE": "Confirme o destino da mensagem",
+        "MESSAGE": "Você está enviando essa mensagem de forma privada. Essa mensagem deve ser enviada para o cliente?",
+        "CONFIRM": "Não",
+        "CANCEL": "Sim",
+        "TEMPLATE_REPLY_MESSAGE": "Para enviar ao cliente agora, use um template aprovado. Seu texto foi mantido em \"Responder para o time\"."
+      },
       "QUOTED_REPLY": {
         "ENABLE_TOOLTIP": "Incluir o encadeamento de e-mails citado",
         "DISABLE_TOOLTIP": "Não incluir o encadeamento de e-mails citado",
@@ -249,6 +260,8 @@
     "FILE_SIZE_LIMIT": "O arquivo excede os {MAXIMUM_SUPPORTED_FILE_UPLOAD_SIZE} MB do limite para anexos",
     "MESSAGE_ERROR": "Não foi possível enviar esta mensagem, por favor, tente novamente mais tarde",
     "SENT_BY": "Enviado por:",
+    "SENT_BY_FULL": "Enviado por {name}",
+    "SENT_BY_AI": "Enviado por {name} (IA)",
     "BOT": "Robôs",
     "SEND_FAILED": "Não foi possível enviar a mensagem! Tente novamente",
     "TRY_AGAIN": "tentar novamente",

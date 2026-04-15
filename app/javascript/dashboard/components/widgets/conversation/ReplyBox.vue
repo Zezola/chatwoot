@@ -17,6 +17,7 @@ import ReplyBottomPanel from 'dashboard/components/widgets/WootWriter/ReplyBotto
 import ArticleSearchPopover from 'dashboard/routes/dashboard/helpcenter/components/ArticleSearch/SearchPopover.vue';
 import MessageSignatureMissingAlert from './MessageSignatureMissingAlert.vue';
 import ReplyBoxBanner from './ReplyBoxBanner.vue';
+import PrivateNoteConfirmModal from './PrivateNoteConfirmModal.vue';
 import QuotedEmailPreview from './QuotedEmailPreview.vue';
 import { REPLY_EDITOR_MODES } from 'dashboard/components/widgets/WootWriter/constants';
 import WootMessageEditor from 'dashboard/components/widgets/WootWriter/Editor.vue';
@@ -64,6 +65,7 @@ export default {
     ReplyBoxBanner,
     EmojiInput,
     MessageSignatureMissingAlert,
+    PrivateNoteConfirmModal,
     ReplyBottomPanel,
     ReplyEmailHead,
     ReplyToMessage,
@@ -186,6 +188,13 @@ export default {
         !(this.isAWhatsAppChannel || this.isAPIInbox)
       );
     },
+    isWhatsAppReplyWindowClosed() {
+      return (
+        this.isAWhatsAppChannel &&
+        !this.currentChat?.can_reply &&
+        !this.isOnPrivateNote
+      );
+    },
     inboxId() {
       return this.currentChat.inbox_id;
     },
@@ -283,6 +292,7 @@ export default {
     replyBoxClass() {
       return {
         'is-private': this.isPrivate,
+        'is-reply-mode': !this.isPrivate,
         'is-focused': this.isFocused || this.hasAttachments,
       };
     },
@@ -391,6 +401,9 @@ export default {
     },
     quotedEmailText() {
       return extractQuotedEmailText(this.lastEmailWithQuotedContent);
+    },
+    canOpenTemplateSelectionModal() {
+      return this.isATwilioWhatsAppChannel || this.isAWhatsAppChannel;
     },
     quotedEmailPreviewText() {
       return truncatePreviewText(this.quotedEmailText, 80);
@@ -556,6 +569,70 @@ export default {
 
       const nextValue = !this.quotedReplyPreference;
       this.setQuotedReplyFlagForInbox(this.channelType, nextValue);
+    },
+    getPrivateNoteConfirmationStorageKey() {
+      const currentUserId = this.currentUser?.id || 'anonymous';
+      return `${this.accountId}:${currentUserId}`;
+    },
+    getPrivateNoteConfirmationCount() {
+      return (
+        LocalStorage.getFromJsonStore(
+          LOCAL_STORAGE_KEYS.PRIVATE_NOTE_CONFIRMATION_COUNT,
+          this.getPrivateNoteConfirmationStorageKey()
+        ) || 0
+      );
+    },
+    incrementPrivateNoteConfirmationCount() {
+      LocalStorage.updateJsonStore(
+        LOCAL_STORAGE_KEYS.PRIVATE_NOTE_CONFIRMATION_COUNT,
+        this.getPrivateNoteConfirmationStorageKey(),
+        this.getPrivateNoteConfirmationCount() + 1
+      );
+    },
+    getDraftKey(replyType) {
+      return `draft-${this.conversationIdByRoute}-${replyType}`;
+    },
+    async confirmPrivateNoteSend() {
+      if (
+        !this.isOnPrivateNote ||
+        this.getPrivateNoteConfirmationCount() >= 5
+      ) {
+        return 'continue';
+      }
+
+      this.incrementPrivateNoteConfirmationCount();
+      const shouldKeepPrivateNote =
+        await this.$refs.privateNoteConfirmDialog.showConfirmation();
+
+      return shouldKeepPrivateNote ? 'continue' : 'switch_to_reply';
+    },
+    switchPrivateNoteToCustomerReply() {
+      const shouldKeepPrivateDraft =
+        this.isAWhatsAppChannel && !this.currentChat?.can_reply;
+
+      if (!shouldKeepPrivateDraft) {
+        this.$store.dispatch('draftMessages/set', {
+          key: this.getDraftKey(REPLY_EDITOR_MODES.REPLY),
+          message: trimContent(this.message || ''),
+        });
+      }
+
+      this.setReplyMode(REPLY_EDITOR_MODES.REPLY);
+
+      if (!shouldKeepPrivateDraft) {
+        this.$nextTick(() => {
+          this.$store.dispatch('draftMessages/delete', {
+            key: this.getDraftKey(REPLY_EDITOR_MODES.NOTE),
+          });
+        });
+        return;
+      }
+
+      useAlert(
+        this.$t(
+          'CONVERSATION.REPLYBOX.PRIVATE_NOTE_CONFIRMATION.TEMPLATE_REPLY_MESSAGE'
+        )
+      );
     },
     shouldIncludeQuotedEmail() {
       return (
@@ -728,6 +805,16 @@ export default {
     hideContentTemplatesModal() {
       this.showContentTemplatesModal = false;
     },
+    openTemplateSelectionModal() {
+      if (this.isATwilioWhatsAppChannel) {
+        this.openContentTemplateModal();
+        return;
+      }
+
+      if (this.isAWhatsAppChannel) {
+        this.openWhatsappTemplateModal();
+      }
+    },
     confirmOnSendReply() {
       if (this.isReplyButtonDisabled) {
         return;
@@ -774,6 +861,20 @@ export default {
           });
     },
     async onSendReply() {
+      if (this.isReplyButtonDisabled) {
+        return;
+      }
+
+      const privateNoteAction = await this.confirmPrivateNoteSend();
+      if (privateNoteAction === 'switch_to_reply') {
+        this.switchPrivateNoteToCustomerReply();
+        return;
+      }
+
+      if (privateNoteAction !== 'continue') {
+        return;
+      }
+
       const undefinedVariables = getUndefinedVariablesInMessage({
         message: this.message,
         variables: this.messageVariables,
@@ -1227,6 +1328,22 @@ export default {
         @play="recordingAudioState = 'playing'"
         @pause="recordingAudioState = 'paused'"
       />
+      <div
+        v-else-if="isWhatsAppReplyWindowClosed"
+        class="reply-box__template-only-state"
+      >
+        <p class="reply-box__template-only-copy">
+          {{ $t('CONVERSATION.REPLYBOX.TEMPLATE_ONLY_MODE.TITLE') }}
+        </p>
+        <button
+          v-if="canOpenTemplateSelectionModal"
+          type="button"
+          class="reply-box__template-only-button"
+          @click="openTemplateSelectionModal"
+        >
+          {{ $t('CONVERSATION.REPLYBOX.TEMPLATE_ONLY_MODE.ACTION') }}
+        </button>
+      </div>
       <ResizableTextArea
         v-else-if="!showRichContentEditor"
         ref="messageInput"
@@ -1274,7 +1391,11 @@ export default {
       />
     </div>
     <div
-      v-if="hasAttachments && !showAudioRecorderEditor"
+      v-if="
+        hasAttachments &&
+        !showAudioRecorderEditor &&
+        !isWhatsAppReplyWindowClosed
+      "
       class="attachment-preview-box"
       @paste="onPaste"
     >
@@ -1285,9 +1406,14 @@ export default {
       />
     </div>
     <MessageSignatureMissingAlert
-      v-if="isSignatureEnabledForInbox && !isSignatureAvailable"
+      v-if="
+        isSignatureEnabledForInbox &&
+        !isSignatureAvailable &&
+        !isWhatsAppReplyWindowClosed
+      "
     />
     <ReplyBottomPanel
+      v-if="!isWhatsAppReplyWindowClosed"
       :conversation-id="conversationId"
       :enable-multiple-file-upload="enableMultipleFileUpload"
       :enable-whats-app-templates="showWhatsappTemplates"
@@ -1341,6 +1467,19 @@ export default {
       :title="$t('CONVERSATION.REPLYBOX.UNDEFINED_VARIABLES.TITLE')"
       :description="undefinedVariableMessage"
     />
+    <PrivateNoteConfirmModal
+      ref="privateNoteConfirmDialog"
+      :title="$t('CONVERSATION.REPLYBOX.PRIVATE_NOTE_CONFIRMATION.TITLE')"
+      :description="
+        $t('CONVERSATION.REPLYBOX.PRIVATE_NOTE_CONFIRMATION.MESSAGE')
+      "
+      :confirm-label="
+        $t('CONVERSATION.REPLYBOX.PRIVATE_NOTE_CONFIRMATION.CONFIRM')
+      "
+      :cancel-label="
+        $t('CONVERSATION.REPLYBOX.PRIVATE_NOTE_CONFIRMATION.CANCEL')
+      "
+    />
   </div>
 </template>
 
@@ -1358,8 +1497,16 @@ export default {
 
   @apply relative mb-2 mx-2 border border-n-weak rounded-xl bg-n-solid-1;
 
+  &.is-reply-mode {
+    border-color: #d9fdd3;
+    background-color: #d9fdd3;
+    box-shadow: 0 0 0 1px #d9fdd3;
+  }
+
   &.is-private {
-    @apply bg-n-solid-amber dark:border-n-amber-3/10 border-n-amber-12/5;
+    border-color: #f6c978;
+    background-color: #fff7e8;
+    box-shadow: 0 0 0 1px #f6c978;
   }
 }
 
@@ -1373,6 +1520,18 @@ export default {
   textarea {
     @apply shadow-none outline-none border-transparent bg-transparent m-0 max-h-60 min-h-[3rem] pt-4 pb-0 px-0 resize-none;
   }
+}
+
+.reply-box__template-only-state {
+  @apply flex flex-col gap-4 py-6 items-center text-center;
+}
+
+.reply-box__template-only-copy {
+  @apply text-sm leading-6 text-n-slate-12 m-0;
+}
+
+.reply-box__template-only-button {
+  @apply inline-flex items-center justify-center h-12 px-5 rounded-lg bg-n-brand text-white text-base font-medium transition-all duration-100 ease-out outline outline-1 outline-transparent hover:brightness-110 focus-visible:brightness-110 active:scale-[0.98];
 }
 
 .emoji-dialog {

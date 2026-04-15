@@ -8,24 +8,24 @@ import { useMessageContext } from '../provider.js';
 import { useI18n } from 'vue-i18n';
 
 import { BUS_EVENTS } from 'shared/constants/busEvents';
-import { MESSAGE_VARIANTS, ORIENTATION } from '../constants';
+import { MESSAGE_VARIANTS, ORIENTATION, SENDER_TYPES } from '../constants';
 
 const props = defineProps({
   hideMeta: { type: Boolean, default: false },
 });
 
-const { variant, orientation, inReplyTo, shouldGroupWithNext } =
+const { variant, orientation, inReplyTo, shouldGroupWithNext, sender } =
   useMessageContext();
 const { t } = useI18n();
 
 const varaintBaseMap = {
-  [MESSAGE_VARIANTS.AGENT]: 'bg-n-solid-blue text-n-slate-12',
+  [MESSAGE_VARIANTS.AGENT]: 'bg-[#D9FDD3] text-n-slate-12',
   [MESSAGE_VARIANTS.PRIVATE]:
     'bg-n-solid-amber text-n-amber-12 [&_.prosemirror-mention-node]:font-semibold',
   [MESSAGE_VARIANTS.USER]: 'bg-n-slate-4 text-n-slate-12',
   [MESSAGE_VARIANTS.ACTIVITY]: 'bg-n-alpha-1 text-n-slate-11 text-sm',
-  [MESSAGE_VARIANTS.BOT]: 'bg-n-solid-iris text-n-slate-12',
-  [MESSAGE_VARIANTS.TEMPLATE]: 'bg-n-solid-iris text-n-slate-12',
+  [MESSAGE_VARIANTS.BOT]: 'bg-[#EEE8FF] text-n-slate-12',
+  [MESSAGE_VARIANTS.TEMPLATE]: 'bg-[#EEE8FF] text-n-slate-12',
   [MESSAGE_VARIANTS.ERROR]: 'bg-n-ruby-4 text-n-ruby-12',
   [MESSAGE_VARIANTS.EMAIL]: 'w-full',
   [MESSAGE_VARIANTS.UNSUPPORTED]:
@@ -75,6 +75,39 @@ const shouldShowMeta = computed(
     variant.value !== MESSAGE_VARIANTS.ACTIVITY
 );
 
+const shouldShowSenderLabel = computed(() => {
+  return [
+    MESSAGE_VARIANTS.AGENT,
+    MESSAGE_VARIANTS.BOT,
+    MESSAGE_VARIANTS.TEMPLATE,
+    MESSAGE_VARIANTS.PRIVATE,
+  ].includes(variant.value);
+});
+
+const isAutomatedSender = computed(() => {
+  return [SENDER_TYPES.AGENT_BOT, SENDER_TYPES.CAPTAIN_ASSISTANT].includes(
+    sender.value?.type
+  );
+});
+
+const senderLabel = computed(() => {
+  const senderName = sender.value?.name || t('CONVERSATION.BOT');
+
+  if (isAutomatedSender.value || variant.value === MESSAGE_VARIANTS.BOT) {
+    return t('CONVERSATION.SENT_BY_AI', { name: senderName });
+  }
+
+  return t('CONVERSATION.SENT_BY_FULL', { name: senderName });
+});
+
+const senderLabelClass = computed(() => {
+  if (variant.value === MESSAGE_VARIANTS.PRIVATE) {
+    return 'text-n-amber-12/80';
+  }
+
+  return 'text-n-slate-11';
+});
+
 const replyToPreview = computed(() => {
   if (!inReplyTo) return '';
 
@@ -110,6 +143,13 @@ const replyToPreview = computed(() => {
       <span class="break-all line-clamp-2">
         {{ replyToPreview }}
       </span>
+    </div>
+    <div
+      v-if="shouldShowSenderLabel"
+      class="mb-2 text-xxs font-medium tracking-[0.02em]"
+      :class="senderLabelClass"
+    >
+      {{ senderLabel }}
     </div>
     <slot />
     <MessageMeta

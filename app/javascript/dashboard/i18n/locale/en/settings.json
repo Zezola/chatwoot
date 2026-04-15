@@ -258,6 +258,22 @@
       "MESSAGE_CLOUD": "You are not part of any accounts right now. If you think this is a mistake, please reach out to our support team.",
       "MESSAGE_SELF_HOSTED": "You are not part of any accounts right now. Please reach out to your administrator.",
       "LOGOUT": "Log out"
+    },
+    "PUSH_NOTIFICATION_BANNER": {
+      "DEFAULT_MESSAGE": "Enable notifications so you don't miss new conversations and replies.",
+      "DEFAULT_ACTION": "Enable notifications",
+      "IOS_MESSAGE": "On iPhone, add Chatwoot to your Home Screen to receive notifications.",
+      "IOS_ACTION": "How to enable",
+      "DENIED_MESSAGE": "Notifications are blocked in your browser. Enable them in your browser settings to receive alerts.",
+      "DISMISS_ACTION": "Don't ask again",
+      "IOS_MODAL": {
+        "TITLE": "Enable notifications on iPhone",
+        "DESCRIPTION": "Follow these steps once to keep receiving alerts in Chatwoot.",
+        "STEP_1": "Tap Share in Safari.",
+        "STEP_2": "Tap Add to Home Screen.",
+        "STEP_3": "Open Chatwoot from the new shortcut on your Home Screen.",
+        "STEP_4": "Allow notifications when Safari asks for permission."
+      }
     }
   },
   "COMPONENTS": {
