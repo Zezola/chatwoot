@@ -19,13 +19,13 @@ const { variant, orientation, inReplyTo, shouldGroupWithNext, sender } =
 const { t } = useI18n();
 
 const varaintBaseMap = {
-  [MESSAGE_VARIANTS.AGENT]: 'bg-[#D9FDD3] text-n-slate-12',
+  [MESSAGE_VARIANTS.AGENT]: 'bg-[#D9FDD3] text-n-slate-12 dark:text-n-slate-1',
   [MESSAGE_VARIANTS.PRIVATE]:
     'bg-n-solid-amber text-n-amber-12 [&_.prosemirror-mention-node]:font-semibold',
   [MESSAGE_VARIANTS.USER]: 'bg-n-slate-4 text-n-slate-12',
   [MESSAGE_VARIANTS.ACTIVITY]: 'bg-n-alpha-1 text-n-slate-11 text-sm',
-  [MESSAGE_VARIANTS.BOT]: 'bg-[#EEE8FF] text-n-slate-12',
-  [MESSAGE_VARIANTS.TEMPLATE]: 'bg-[#EEE8FF] text-n-slate-12',
+  [MESSAGE_VARIANTS.BOT]: 'bg-[#EEE8FF] text-n-slate-12 dark:text-n-slate-1',
+  [MESSAGE_VARIANTS.TEMPLATE]: 'bg-[#EEE8FF] text-n-slate-12 dark:text-n-slate-1',
   [MESSAGE_VARIANTS.ERROR]: 'bg-n-ruby-4 text-n-ruby-12',
   [MESSAGE_VARIANTS.EMAIL]: 'w-full',
   [MESSAGE_VARIANTS.UNSUPPORTED]:
@@ -105,6 +105,14 @@ const senderLabelClass = computed(() => {
     return 'text-n-amber-12/80';
   }
 
+  if (
+    [MESSAGE_VARIANTS.AGENT, MESSAGE_VARIANTS.BOT, MESSAGE_VARIANTS.TEMPLATE].includes(
+      variant.value
+    )
+  ) {
+    return 'text-n-slate-11 dark:text-n-slate-9';
+  }
+
   return 'text-n-slate-11';
 });
 
@@ -159,6 +167,12 @@ const replyToPreview = computed(() => {
         variant === MESSAGE_VARIANTS.EMAIL ? 'px-3 pb-3' : '',
         variant === MESSAGE_VARIANTS.PRIVATE
           ? 'text-n-amber-12/50'
+          : [
+                MESSAGE_VARIANTS.AGENT,
+                MESSAGE_VARIANTS.BOT,
+                MESSAGE_VARIANTS.TEMPLATE,
+              ].includes(variant)
+            ? 'text-n-slate-11 dark:text-n-slate-9'
           : 'text-n-slate-11',
       ]"
       class="mt-2"
