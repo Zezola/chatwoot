@@ -52,6 +52,7 @@ export default {
     v-tooltip.top-end="
       $t('INTEGRATION_SETTINGS.DYTE.START_VIDEO_CALL_HELP_TEXT')
     "
+    class="dark:!text-n-slate-1"
     icon="i-ph-video-camera"
     slate
     faded

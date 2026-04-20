@@ -58,8 +58,8 @@ const translateValue = computed(() => {
 
 const toggleClass = computed(() => {
   return isPrivate.value
-    ? 'border-[#f6c978] bg-[#fff7e8] text-n-slate-12'
-    : 'border-[#d9fdd3] bg-[#d9fdd3] text-n-slate-12';
+    ? 'border-[#f6c978] bg-[#fff7e8] text-n-slate-12 dark:text-n-slate-1'
+    : 'border-[#d9fdd3] bg-[#d9fdd3] text-n-slate-12 dark:text-n-slate-1';
 });
 
 const activeChipClass = computed(() => {

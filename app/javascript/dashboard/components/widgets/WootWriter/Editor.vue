@@ -862,7 +862,7 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
   }
 
   > .ProseMirror {
-    @apply p-0 break-words text-n-slate-12;
+    @apply p-0 break-words text-n-slate-12 dark:text-n-slate-1;
 
     h1,
     h2,
@@ -871,7 +871,7 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
     h5,
     h6,
     p {
-      @apply text-n-slate-12;
+      @apply text-n-slate-12 dark:text-n-slate-1;
     }
 
     blockquote {
@@ -916,15 +916,15 @@ useEmitter(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, insertContentIntoEditor);
 
 .is-private {
   .prosemirror-mention-node {
-    @apply font-medium bg-n-amber-2/80 dark:bg-n-amber-2/80 text-n-slate-12 py-0 px-1;
+    @apply font-medium bg-n-amber-2/80 dark:bg-n-amber-2/80 text-n-slate-12 dark:text-n-slate-1 py-0 px-1;
   }
 
   .ProseMirror-menubar-wrapper {
     > .ProseMirror {
-      @apply text-n-slate-12;
+      @apply text-n-slate-12 dark:text-n-slate-1;
 
       p {
-        @apply text-n-slate-12;
+        @apply text-n-slate-12 dark:text-n-slate-1;
       }
     }
   }

@@ -281,6 +281,7 @@ export default {
     <div class="left-wrap">
       <NextButton
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_EMOJI_ICON')"
+        class="dark:!text-n-slate-1"
         icon="i-ph-smiley-sticker"
         slate
         faded
@@ -305,6 +306,7 @@ export default {
         <NextButton
           v-if="showAttachButton"
           v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_ATTACH_ICON')"
+          class="dark:!text-n-slate-1"
           icon="i-ph-paperclip"
           slate
           faded
@@ -314,6 +316,7 @@ export default {
       <NextButton
         v-if="showAudioRecorderButton"
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_AUDIORECORDER_ICON')"
+        class="dark:!text-n-slate-1"
         :icon="!isRecordingAudio ? 'i-ph-microphone' : 'i-ph-microphone-slash'"
         slate
         faded
@@ -322,6 +325,7 @@ export default {
       />
       <NextButton
         v-if="showAudioPlayStopButton"
+        class="dark:!text-n-slate-1"
         :icon="audioRecorderPlayStopIcon"
         slate
         faded
@@ -332,6 +336,7 @@ export default {
       <NextButton
         v-if="showMessageSignatureButton"
         v-tooltip.top-end="signatureToggleTooltip"
+        class="dark:!text-n-slate-1"
         icon="i-ph-signature"
         slate
         faded
@@ -341,6 +346,7 @@ export default {
       <NextButton
         v-if="showQuotedReplyToggle"
         v-tooltip.top-end="quotedReplyToggleTooltip"
+        class="dark:!text-n-slate-1"
         icon="i-ph-quotes"
         :variant="quotedReplyEnabled ? 'solid' : 'faded'"
         color="slate"
@@ -351,6 +357,7 @@ export default {
       <NextButton
         v-if="enableWhatsAppTemplates"
         v-tooltip.top-end="$t('CONVERSATION.FOOTER.WHATSAPP_TEMPLATES')"
+        class="dark:!text-n-slate-1"
         icon="i-ph-whatsapp-logo"
         slate
         faded
@@ -360,6 +367,7 @@ export default {
       <NextButton
         v-if="enableContentTemplates"
         v-tooltip.top-end="'Content Templates'"
+        class="dark:!text-n-slate-1"
         icon="i-ph-whatsapp-logo"
         slate
         faded
@@ -391,6 +399,7 @@ export default {
       <NextButton
         v-if="enableInsertArticleInReply"
         v-tooltip.top-end="$t('HELP_CENTER.ARTICLE_SEARCH.OPEN_ARTICLE_SEARCH')"
+        class="dark:!text-n-slate-1"
         icon="i-ph-article-ny-times"
         slate
         faded
