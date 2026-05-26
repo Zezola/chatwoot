@@ -31,6 +31,18 @@ describe WebhookListener do
         expect(WebhookJob).to receive(:perform_later).with(webhook.url, message.webhook_data.merge(event: 'message_created')).once
         listener.message_created(message_created_event)
       end
+
+      it 'includes performed_by when present' do
+        webhook = create(:webhook, inbox: inbox, account: account)
+        event = Events::Base.new(event_name, Time.zone.now, message: message, performed_by: user)
+
+        expect(WebhookJob).to receive(:perform_later).with(
+          webhook.url,
+          message.webhook_data.merge(event: 'message_created', performed_by: { type: 'user', id: user.id })
+        ).once
+
+        listener.message_created(event)
+      end
     end
 
     context 'when webhook is configured and event is not subscribed' do
@@ -93,6 +105,18 @@ describe WebhookListener do
         expect(WebhookJob).to receive(:perform_later).with(webhook.url, conversation.webhook_data.merge(event: 'conversation_created')).once
         listener.conversation_created(conversation_created_event)
       end
+
+      it 'includes performed_by when present' do
+        webhook = create(:webhook, inbox: inbox, account: account)
+        event = Events::Base.new(event_name, Time.zone.now, conversation: conversation, performed_by: user)
+
+        expect(WebhookJob).to receive(:perform_later).with(
+          webhook.url,
+          conversation.webhook_data.merge(event: 'conversation_created', performed_by: { type: 'user', id: user.id })
+        ).once
+
+        listener.conversation_created(event)
+      end
     end
 
     context 'when inbox is an API Channel' do
@@ -124,6 +148,7 @@ describe WebhookListener do
       Events::Base.new(
         event_name, Time.zone.now,
         conversation: conversation.reload,
+        performed_by: user,
         changed_attributes: {
           custom_attributes: [{ test: nil }, { test: 'testing custom attri webhook' }]
         }
@@ -155,11 +180,97 @@ describe WebhookListener do
                   current_value: { test: 'testing custom attri webhook' }
                 }
               }
-            ]
+            ],
+            performed_by: { type: 'user', id: user.id }
           )
         ).once
 
         listener.conversation_updated(conversation_updated_event)
+      end
+
+      it 'does not include performed_by when not present' do
+        webhook = create(:webhook, inbox: inbox, account: account)
+        event = Events::Base.new(
+          event_name, Time.zone.now,
+          conversation: conversation.reload,
+          changed_attributes: {
+            custom_attributes: [{ test: nil }, { test: 'testing custom attri webhook' }]
+          }
+        )
+
+        expect(WebhookJob).to receive(:perform_later).with(
+          webhook.url,
+          conversation.webhook_data.merge(
+            event: 'conversation_updated',
+            changed_attributes: [
+              {
+                custom_attributes: {
+                  previous_value: { test: nil },
+                  current_value: { test: 'testing custom attri webhook' }
+                }
+              }
+            ]
+          )
+        ).once
+
+        listener.conversation_updated(event)
+      end
+
+      it 'includes automation rules as performed_by' do
+        webhook = create(:webhook, inbox: inbox, account: account)
+        automation_rule = create(:automation_rule, account: account)
+        event = Events::Base.new(
+          event_name, Time.zone.now,
+          conversation: conversation.reload,
+          performed_by: automation_rule,
+          changed_attributes: {
+            custom_attributes: [{ test: nil }, { test: 'testing custom attri webhook' }]
+          }
+        )
+
+        expect(WebhookJob).to receive(:perform_later).with(
+          webhook.url,
+          conversation.webhook_data.merge(
+            event: 'conversation_updated',
+            changed_attributes: [
+              {
+                custom_attributes: {
+                  previous_value: { test: nil },
+                  current_value: { test: 'testing custom attri webhook' }
+                }
+              }
+            ],
+            performed_by: { type: 'automation_rule', id: automation_rule.id }
+          )
+        ).once
+
+        listener.conversation_updated(event)
+      end
+    end
+  end
+
+  describe '#conversation_status_changed' do
+    let(:event_name) { :'conversation.status_changed' }
+    let(:changed_attributes) { { 'status' => %w[open resolved] } }
+    let(:conversation_status_changed_event) do
+      Events::Base.new(event_name, Time.zone.now, conversation: conversation.reload, performed_by: user,
+                                                    changed_attributes: changed_attributes)
+    end
+
+    context 'when webhook is configured' do
+      it 'includes performed_by' do
+        webhook = create(:webhook, inbox: inbox, account: account, subscriptions: ['conversation_status_changed'])
+
+        expect(WebhookJob).to receive(:perform_later).with(
+          webhook.url,
+          conversation.webhook_data.merge(
+            event: 'conversation_status_changed',
+            changed_attributes: [{ 'status' => { previous_value: 'open', current_value: 'resolved' } }],
+            performed_by: { type: 'user', id: user.id }
+          )
+        ).once
+
+        listener.conversation_status_changed(conversation_status_changed_event)
       end
     end
   end

@@ -6,8 +6,7 @@ require Rails.root.join 'spec/models/concerns/auto_assignment_handler_shared.rb'
 
 RSpec.describe Conversation do
   after do
-    Current.user = nil
-    Current.account = nil
+    Current.reset
   end
 
   describe 'associations' do
@@ -135,7 +134,7 @@ RSpec.describe Conversation do
           conversation: conversation,
           notifiable_assignee_change: false,
           changed_attributes: changed_attributes,
-          performed_by: nil
+          performed_by: old_assignee
         )
     end
 
@@ -150,16 +149,34 @@ RSpec.describe Conversation do
 
       expect(Rails.configuration.dispatcher).to have_received(:dispatch)
         .with(described_class::CONVERSATION_RESOLVED, kind_of(Time), conversation: conversation, notifiable_assignee_change: true,
-                                                                     changed_attributes: status_change, performed_by: nil)
+                                                                     changed_attributes: status_change, performed_by: old_assignee)
       expect(Rails.configuration.dispatcher).to have_received(:dispatch)
         .with(described_class::CONVERSATION_READ, kind_of(Time), conversation: conversation, notifiable_assignee_change: true,
-                                                                 changed_attributes: nil, performed_by: nil)
+                                                                 changed_attributes: nil, performed_by: old_assignee)
       expect(Rails.configuration.dispatcher).to have_received(:dispatch)
         .with(described_class::ASSIGNEE_CHANGED, kind_of(Time), conversation: conversation, notifiable_assignee_change: true,
-                                                                changed_attributes: changed_attributes, performed_by: nil)
+                                                                changed_attributes: changed_attributes, performed_by: old_assignee)
       expect(Rails.configuration.dispatcher).to have_received(:dispatch)
         .with(described_class::CONVERSATION_UPDATED, kind_of(Time), conversation: conversation, notifiable_assignee_change: true,
-                                                                    changed_attributes: changed_attributes, performed_by: nil)
+                                                                    changed_attributes: changed_attributes, performed_by: old_assignee)
+    end
+
+    it 'prefers executed_by over current user for dispatched events' do
+      automation_rule = create(:automation_rule, account: account)
+      Current.executed_by = automation_rule
+
+      conversation.update(label_list: [label.title])
+      changed_attributes = conversation.previous_changes
+
+      expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+        .with(
+          described_class::CONVERSATION_UPDATED,
+          kind_of(Time),
+          conversation: conversation,
+          notifiable_assignee_change: false,
+          changed_attributes: changed_attributes,
+          performed_by: automation_rule
+        )
     end
 
     it 'will not run conversation_updated event for empty updates' do
@@ -180,7 +197,7 @@ RSpec.describe Conversation do
       changed_attributes = conversation.previous_changes
       expect(Rails.configuration.dispatcher).to have_received(:dispatch)
         .with(described_class::CONVERSATION_UPDATED, kind_of(Time), conversation: conversation, notifiable_assignee_change: false,
-                                                                    changed_attributes: changed_attributes, performed_by: nil)
+                                                                    changed_attributes: changed_attributes, performed_by: old_assignee)
     end
 
     it 'will not run conversation_updated event for bowser_language in additional_attributes' do

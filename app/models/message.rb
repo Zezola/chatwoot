@@ -230,7 +230,7 @@ class Message < ApplicationRecord
   end
 
   def send_update_event
-    Rails.configuration.dispatcher.dispatch(MESSAGE_UPDATED, Time.zone.now, message: self, performed_by: Current.executed_by,
+    Rails.configuration.dispatcher.dispatch(MESSAGE_UPDATED, Time.zone.now, message: self, performed_by: event_performed_by,
                                                                             previous_changes: previous_changes)
   end
 
@@ -342,10 +342,10 @@ class Message < ApplicationRecord
   end
 
   def dispatch_create_events
-    Rails.configuration.dispatcher.dispatch(MESSAGE_CREATED, Time.zone.now, message: self, performed_by: Current.executed_by)
+    Rails.configuration.dispatcher.dispatch(MESSAGE_CREATED, Time.zone.now, message: self, performed_by: event_performed_by)
 
     if valid_first_reply?
-      Rails.configuration.dispatcher.dispatch(FIRST_REPLY_CREATED, Time.zone.now, message: self, performed_by: Current.executed_by)
+      Rails.configuration.dispatcher.dispatch(FIRST_REPLY_CREATED, Time.zone.now, message: self, performed_by: event_performed_by)
       conversation.update(first_reply_created_at: created_at, waiting_since: nil)
     else
       update_waiting_since
@@ -358,6 +358,10 @@ class Message < ApplicationRecord
     return if previous_changes.blank?
 
     send_update_event
+  end
+
+  def event_performed_by
+    Current.executed_by || Current.user
   end
 
   def send_reply
