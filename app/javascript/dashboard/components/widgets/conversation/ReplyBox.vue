@@ -300,7 +300,7 @@ export default {
       return this.attachedFiles.length;
     },
     showAudioRecorder() {
-      return !this.isOnPrivateNote && this.showFileUpload;
+      return this.showFileUpload && !this.isWhatsAppReplyWindowClosed;
     },
     showAudioRecorderEditor() {
       return this.showAudioRecorder && this.isRecordingAudio;

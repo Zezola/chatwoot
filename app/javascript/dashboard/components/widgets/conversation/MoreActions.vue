@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onUnmounted, ref, onMounted, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useToggle, useWindowSize } from '@vueuse/core';
 import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
@@ -35,47 +35,12 @@ const { width: windowWidth } = useWindowSize();
 const isMobile = computed(() => windowWidth.value < 1280);
 
 const virtiAvailable = ref(false);
+const idRobo = ref(null);
 const infosUser = ref({});
 const followUpAtivado = ref(false);
 const followUpLoading = ref(false);
 const followUpDisponivel = ref(false);
-
-const fetchFollowUpStatus = async () => {
-  const idRobo = await virtiAuth.resolveRobo(currentChat.value?.inbox_id);
-  const userId = idUsuario.value;
-  if (!idRobo || !userId) return;
-  try {
-    const res = await virtiGet(
-      `/api/v1/conversas/follow-up/${idRobo}/${userId}`
-    );
-    followUpDisponivel.value = Boolean(res?.data?.disponivel);
-    followUpAtivado.value = Boolean(res?.data?.ativo);
-  } catch {
-    followUpDisponivel.value = false;
-    followUpAtivado.value = false;
-  }
-};
-
-onMounted(async () => {
-  await virtiAuth.ensureToken();
-  virtiAvailable.value = virtiAuth.getAvailability();
-
-  if (virtiAvailable.value) {
-    const idRobo = await virtiAuth.resolveRobo(currentChat.value?.inbox_id);
-    const userId = idUsuario.value;
-    if (idRobo && userId) {
-      try {
-        const res = await virtiGet(
-          `/api/v1/infos_user/${idRobo}/${userId}/all`
-        );
-        infosUser.value = res?.data || {};
-      } catch {
-        // silently fail — não impede o uso do resto
-      }
-      await fetchFollowUpStatus();
-    }
-  }
-});
+let refreshSeq = 0;
 
 const currentChat = computed(() => store.getters.getSelectedChat);
 
@@ -88,22 +53,68 @@ const idUsuario = computed(() => {
   return `chatwoot_${phone.replace('+', '')}`;
 });
 
-watch(idUsuario, async (newId, oldId) => {
-  if (!newId || newId === oldId) return;
-  if (!virtiAvailable.value) return;
+const virtiReady = computed(() =>
+  Boolean(virtiAvailable.value && idRobo.value && idUsuario.value)
+);
 
-  const idRobo = await virtiAuth.resolveRobo(currentChat.value?.inbox_id);
-  if (!idRobo) return;
+const resetVirtiData = () => {
+  idRobo.value = null;
+  infosUser.value = {};
+  followUpAtivado.value = false;
+  followUpDisponivel.value = false;
+};
+
+const fetchFollowUpStatus = async seq => {
+  const roboId = idRobo.value;
+  const userId = idUsuario.value;
+  if (!roboId || !userId) return;
+  try {
+    const res = await virtiGet(
+      `/api/v1/conversas/follow-up/${roboId}/${userId}`
+    );
+    if (seq && seq !== refreshSeq) return;
+    followUpDisponivel.value = Boolean(res?.data?.disponivel);
+    followUpAtivado.value = Boolean(res?.data?.ativo);
+  } catch {
+    if (seq && seq !== refreshSeq) return;
+    followUpDisponivel.value = false;
+    followUpAtivado.value = false;
+  }
+};
+
+const refreshVirtiData = async () => {
+  const seq = ++refreshSeq;
+  resetVirtiData();
+
+  const token = await virtiAuth.ensureToken();
+  if (seq !== refreshSeq) return;
+
+  virtiAvailable.value = virtiAuth.getAvailability();
+  if (!token || !virtiAvailable.value) return;
+
+  const resolvedRobo = await virtiAuth.resolveRobo(currentChat.value?.inbox_id);
+  if (seq !== refreshSeq) return;
+  if (!resolvedRobo) return;
+
+  idRobo.value = resolvedRobo;
+
+  const userId = idUsuario.value;
+  if (!userId) return;
 
   try {
     const res = await virtiGet(
-      `/api/v1/infos_user/${idRobo}/${newId}/all`
+      `/api/v1/infos_user/${resolvedRobo}/${userId}/all`
     );
+    if (seq !== refreshSeq) return;
     infosUser.value = res?.data || {};
   } catch {
     infosUser.value = {};
   }
-  await fetchFollowUpStatus();
+  await fetchFollowUpStatus(seq);
+};
+
+watch([() => currentChat.value?.inbox_id, idUsuario], refreshVirtiData, {
+  immediate: true,
 });
 
 const statusConversa = computed(() => {
@@ -120,19 +131,19 @@ const statusConversa = computed(() => {
 });
 
 const toggleFollowUp = async () => {
-  const idRobo = await virtiAuth.resolveRobo(currentChat.value?.inbox_id);
+  const roboId = idRobo.value;
   const userId = idUsuario.value;
-  if (!idRobo || !userId) return;
+  if (!roboId || !userId) return;
 
   followUpLoading.value = true;
   try {
     if (!followUpAtivado.value) {
-      await virtiPost(`/api/v1/conversas/follow-up/${idRobo}/${userId}`);
+      await virtiPost(`/api/v1/conversas/follow-up/${roboId}/${userId}`);
       followUpAtivado.value = true;
       infosUser.value = { ...infosUser.value, StatusConversa: 'follow_up' };
       useAlert('Follow-up ativado com sucesso.');
     } else {
-      await virtiDelete(`/api/v1/conversas/follow-up/${idRobo}/${userId}`);
+      await virtiDelete(`/api/v1/conversas/follow-up/${roboId}/${userId}`);
       followUpAtivado.value = false;
       infosUser.value = { ...infosUser.value, StatusConversa: 'abandonada' };
       useAlert('Follow-up desativado com sucesso.');
@@ -147,7 +158,7 @@ const toggleFollowUp = async () => {
 const actionMenuItems = computed(() => {
   const items = [];
 
-  if (virtiAvailable.value && isMobile.value) {
+  if (virtiReady.value && isMobile.value) {
     items.push({
       icon: 'i-lucide-info',
       label: 'Info do Contato',
@@ -252,7 +263,7 @@ onUnmounted(() => {
 <template>
   <div class="relative flex items-center gap-2 actions--container">
     <ButtonV4
-      v-if="virtiAvailable"
+      v-if="virtiReady"
       size="sm"
       variant="faded"
       color="slate"
@@ -262,7 +273,7 @@ onUnmounted(() => {
       @click="toggleVirtiInfoModal(true)"
     />
     <ButtonV4
-      v-if="virtiAvailable && followUpDisponivel"
+      v-if="virtiReady && followUpDisponivel"
       size="sm"
       variant="faded"
       :color="followUpAtivado ? 'blue' : 'slate'"
@@ -274,7 +285,7 @@ onUnmounted(() => {
       @click="toggleFollowUp"
     />
     <ButtonV4
-      v-if="virtiAvailable"
+      v-if="virtiReady"
       size="sm"
       variant="faded"
       color="slate"
@@ -284,7 +295,7 @@ onUnmounted(() => {
       @click="toggleVirtiStatusModal(true)"
     />
     <ButtonV4
-      v-if="virtiAvailable"
+      v-if="virtiReady"
       size="sm"
       variant="faded"
       color="slate"

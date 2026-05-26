@@ -179,7 +179,7 @@ export default {
     showAttachButton() {
       return this.showFileUpload || this.isNote;
     },
-    showAudioRecorderButton() {
+    canRecordAudio() {
       if (this.isALineChannel) {
         return false;
       }
@@ -196,8 +196,23 @@ export default {
         // !isSafari
       );
     },
+    showAudioRecorderButton() {
+      return this.canRecordAudio && !this.isRecordingAudio;
+    },
+    showAudioStopButton() {
+      return (
+        this.canRecordAudio &&
+        this.isRecordingAudio &&
+        !this.recordingAudioState
+      );
+    },
+    showAudioCancelButton() {
+      return this.canRecordAudio && this.isRecordingAudio;
+    },
     showAudioPlayStopButton() {
-      return this.showAudioRecorder && this.isRecordingAudio;
+      return Boolean(
+        this.canRecordAudio && this.isRecordingAudio && this.recordingAudioState
+      );
     },
     isInstagramDM() {
       return this.conversationType === 'instagram_direct_message';
@@ -317,11 +332,21 @@ export default {
         v-if="showAudioRecorderButton"
         v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_AUDIORECORDER_ICON')"
         class="dark:!text-n-slate-1"
-        :icon="!isRecordingAudio ? 'i-ph-microphone' : 'i-ph-microphone-slash'"
+        icon="i-ph-microphone"
         slate
         faded
         sm
         @click="toggleAudioRecorder"
+      />
+      <NextButton
+        v-if="showAudioStopButton"
+        v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_AUDIORECORDER_ICON')"
+        icon="i-ph-stop"
+        :label="recordingAudioDurationText"
+        color="ruby"
+        variant="solid"
+        sm
+        @click="toggleAudioRecorderPlayPause"
       />
       <NextButton
         v-if="showAudioPlayStopButton"
@@ -332,6 +357,16 @@ export default {
         sm
         :label="recordingAudioDurationText"
         @click="toggleAudioRecorderPlayPause"
+      />
+      <NextButton
+        v-if="showAudioCancelButton"
+        v-tooltip.top-end="$t('CONVERSATION.REPLYBOX.TIP_AUDIORECORDER_ICON')"
+        class="dark:!text-n-slate-1"
+        icon="i-ph-x"
+        slate
+        faded
+        sm
+        @click="toggleAudioRecorder"
       />
       <NextButton
         v-if="showMessageSignatureButton"

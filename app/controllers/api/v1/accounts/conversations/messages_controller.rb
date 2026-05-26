@@ -18,6 +18,19 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @message = message
   end
 
+  def audio_transcription
+    attachment = message.attachments.audio.find(permitted_params[:attachment_id])
+    text = permitted_params[:transcribed_text].to_s.strip
+
+    ActiveRecord::Base.transaction do
+      attachment.update!(meta: (attachment.meta || {}).merge('transcribed_text' => text))
+      message.association(:attachments).reset
+      message.touch
+    end
+
+    render json: message.reload.push_event_data
+  end
+
   def destroy
     ActiveRecord::Base.transaction do
       message.update!(content: I18n.t('conversations.messages.deleted'), content_type: :text, content_attributes: { deleted: true })
@@ -65,7 +78,14 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   def permitted_params
-    params.permit(:id, :target_language, :status, :external_error)
+    params.permit(
+      :id,
+      :target_language,
+      :status,
+      :external_error,
+      :attachment_id,
+      :transcribed_text
+    )
   end
 
   def already_translated_content_available?

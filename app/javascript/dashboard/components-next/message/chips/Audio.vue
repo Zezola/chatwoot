@@ -12,10 +12,14 @@ import { downloadFile } from '@chatwoot/utils';
 import { useEmitter } from 'dashboard/composables/emitter';
 import { emitter } from 'shared/helpers/mitt';
 
-const { attachment } = defineProps({
+const { attachment, isPrivate } = defineProps({
   attachment: {
     type: Object,
     required: true,
+  },
+  isPrivate: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -43,6 +47,10 @@ const onLoadedMetadata = () => {
 
 const playbackSpeedLabel = computed(() => {
   return `${playbackSpeed.value}x`;
+});
+
+const transcribedText = computed(() => {
+  return attachment.transcribedText || attachment.transcribed_text || '';
 });
 
 // There maybe a chance that the audioPlayer ref is not available
@@ -134,7 +142,12 @@ const downloadAudio = async () => {
   </audio>
   <div
     v-bind="$attrs"
-    class="rounded-xl w-full gap-2 p-1.5 bg-n-alpha-white flex flex-col items-center border border-n-container shadow-[0px_2px_8px_0px_rgba(94,94,94,0.06)]"
+    class="rounded-xl w-full gap-2 p-1.5 flex flex-col items-center border"
+    :class="
+      isPrivate
+        ? 'bg-n-alpha-black1 border-n-amber-12/20 shadow-none'
+        : 'bg-n-alpha-white border-n-container shadow-[0px_2px_8px_0px_rgba(94,94,94,0.06)]'
+    "
   >
     <div class="flex gap-1 w-full flex-1 items-center justify-start">
       <button class="p-0 border-0 size-8" @click="playOrPause">
@@ -182,10 +195,15 @@ const downloadAudio = async () => {
     </div>
 
     <div
-      v-if="attachment.transcribedText"
-      class="text-n-slate-12 p-3 text-sm bg-n-alpha-1 rounded-lg w-full break-words"
+      v-if="transcribedText"
+      class="p-3 text-sm rounded-lg w-full break-words"
+      :class="
+        isPrivate
+          ? 'text-n-amber-12 bg-n-alpha-black1'
+          : 'text-n-slate-12 bg-n-alpha-1'
+      "
     >
-      {{ attachment.transcribedText }}
+      {{ transcribedText }}
     </div>
   </div>
 </template>
