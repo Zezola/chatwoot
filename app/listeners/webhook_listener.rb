@@ -4,6 +4,7 @@ class WebhookListener < BaseListener
     changed_attributes = extract_changed_attributes(event)
     inbox = conversation.inbox
     payload = conversation.webhook_data.merge(event: __method__.to_s, changed_attributes: changed_attributes)
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
@@ -12,6 +13,7 @@ class WebhookListener < BaseListener
     changed_attributes = extract_changed_attributes(event)
     inbox = conversation.inbox
     payload = conversation.webhook_data.merge(event: __method__.to_s, changed_attributes: changed_attributes)
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
@@ -19,6 +21,7 @@ class WebhookListener < BaseListener
     conversation = extract_conversation_and_account(event)[0]
     inbox = conversation.inbox
     payload = conversation.webhook_data.merge(event: __method__.to_s)
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
@@ -29,6 +32,7 @@ class WebhookListener < BaseListener
     return unless message.webhook_sendable?
 
     payload = message.webhook_data.merge(event: __method__.to_s)
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
@@ -39,6 +43,7 @@ class WebhookListener < BaseListener
     return unless message.webhook_sendable?
 
     payload = message.webhook_data.merge(event: __method__.to_s)
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
@@ -48,12 +53,14 @@ class WebhookListener < BaseListener
 
     payload = contact_inbox.webhook_data.merge(event: __method__.to_s)
     payload[:event_info] = event.data[:event_info]
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
   def contact_created(event)
     contact, account = extract_contact_and_account(event)
     payload = contact.webhook_data.merge(event: __method__.to_s)
+    payload = with_performed_by(payload, event)
     deliver_account_webhooks(payload, account)
   end
 
@@ -63,6 +70,7 @@ class WebhookListener < BaseListener
     return if changed_attributes.blank?
 
     payload = contact.webhook_data.merge(event: __method__.to_s, changed_attributes: changed_attributes)
+    payload = with_performed_by(payload, event)
     deliver_account_webhooks(payload, account)
   end
 
@@ -70,6 +78,7 @@ class WebhookListener < BaseListener
     inbox, account = extract_inbox_and_account(event)
     inbox_webhook_data = Inbox::EventDataPresenter.new(inbox).push_data
     payload = inbox_webhook_data.merge(event: __method__.to_s)
+    payload = with_performed_by(payload, event)
     deliver_account_webhooks(payload, account)
   end
 
@@ -80,6 +89,7 @@ class WebhookListener < BaseListener
 
     inbox_webhook_data = Inbox::EventDataPresenter.new(inbox).push_data
     payload = inbox_webhook_data.merge(event: __method__.to_s, changed_attributes: changed_attributes)
+    payload = with_performed_by(payload, event)
     deliver_account_webhooks(payload, account)
   end
 
@@ -93,6 +103,23 @@ class WebhookListener < BaseListener
 
   private
 
+  def with_performed_by(payload, event)
+    performed_by_data = performed_by_payload(event)
+    return payload if performed_by_data.blank?
+
+    payload.merge(performed_by: performed_by_data)
+  end
+
+  def performed_by_payload(event)
+    actor = event.data[:performed_by]
+    return if actor.blank?
+
+    {
+      type: actor.model_name.singular,
+      id: actor.id
+    }
+  end
+
   def handle_typing_status(event_name, event)
     conversation = event.data[:conversation]
     user = event.data[:user]
@@ -104,6 +131,7 @@ class WebhookListener < BaseListener
       conversation: conversation.webhook_data,
       is_private: event.data[:is_private] || false
     }
+    payload = with_performed_by(payload, event)
     deliver_webhook_payloads(payload, inbox)
   end
 
