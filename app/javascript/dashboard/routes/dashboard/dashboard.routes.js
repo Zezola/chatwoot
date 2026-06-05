@@ -14,6 +14,7 @@ import { routes as captainRoutes } from './captain/captain.routes';
 import AppContainer from './Dashboard.vue';
 import Suspended from './suspended/Index.vue';
 import NoAccounts from './noAccounts/Index.vue';
+import OnboardingAccountDetails from './onboarding/Index.vue';
 
 export default {
   routes: [
@@ -34,6 +35,14 @@ export default {
         ...kanbanRoutes,
         ...aclRoutes
       ],
+    },
+    {
+      path: frontendURL('accounts/:accountId/onboarding'),
+      name: 'onboarding_account_details',
+      meta: {
+        permissions: ['administrator', 'agent', 'custom_role'],
+      },
+      component: OnboardingAccountDetails,
     },
     {
       path: frontendURL('accounts/:accountId/suspended'),

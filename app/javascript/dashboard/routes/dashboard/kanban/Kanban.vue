@@ -67,7 +67,7 @@ export default {
       // If labelToRemove is part of item labels, remove it
       const labelToRemoveIndex = itemLabels.findIndex(label => label === labelToRemove.title)
       if (labelToRemoveIndex > -1) {
-        itemLabels.splice(labelToRemove, 1)
+        itemLabels.splice(labelToRemoveIndex, 1)
       }
       // If labelToAdd is not part of item labels, add it
       const labelToAddIndex = itemLabels.findIndex(label => label === labelToAdd.title)
@@ -308,7 +308,7 @@ export default {
 
         const filters = [{
           attribute_key: "labels",
-          attribute_model: "standart",
+          attribute_model: "standard",
           filter_operator: "equal_to",
           values: labelTitles,
           custom_attribute_type: ""

@@ -1,5 +1,6 @@
 export const LOCAL_STORAGE_KEYS = {
   DISMISSED_UPDATES: 'dismissedUpdates',
+  DISMISSED_PLATFORM_BANNERS: 'dismissedPlatformBanners',
   WIDGET_BUILDER: 'widgetBubble_',
   DRAFT_MESSAGES: 'draftMessages',
   COLOR_SCHEME: 'color_scheme',
@@ -7,4 +8,5 @@ export const LOCAL_STORAGE_KEYS = {
   MESSAGE_REPLY_TO: 'messageReplyTo',
   PRIVATE_NOTE_CONFIRMATION_COUNT: 'privateNoteConfirmationCount',
   PUSH_NOTIFICATION_BANNER_DISMISSED: 'pushNotificationBannerDismissed',
+  RECENT_SEARCHES: 'recentSearches',
 };

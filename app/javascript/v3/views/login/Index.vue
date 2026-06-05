@@ -26,6 +26,7 @@ const ERROR_MESSAGES = {
 };
 
 const IMPERSONATION_URL_SEARCH_KEY = 'impersonation';
+const USER_NOT_CONFIRMED_ERROR_CODE = 'user_not_confirmed';
 
 export default {
   components: {
@@ -186,6 +187,15 @@ export default {
 
         })
         .catch(response => {
+          if (response?.errorCode === USER_NOT_CONFIRMED_ERROR_CODE) {
+            this.loginApi.showLoading = false;
+            this.$router.push({
+              name: 'auth_verify_email',
+              state: { email: credentials.email },
+            });
+            return;
+          }
+
           // Reset URL Params if the authentication is invalid
           if (this.email) {
             window.location = '/app/login';

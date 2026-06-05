@@ -21,7 +21,14 @@ module Whatsapp::IncomingMessageServiceHelpers
   end
 
   def message_type
-    @processed_params[:messages].first[:type]
+    message = messages_data.first
+    message[:type].presence || inferred_message_type(message)
+  end
+
+  def inferred_message_type(message)
+    %w[text image audio voice video document sticker button interactive location contacts].find do |type|
+      message[type].present?
+    end
   end
 
   def message_content(message)
@@ -69,20 +76,14 @@ module Whatsapp::IncomingMessageServiceHelpers
     @message = Message.find_by(source_id: source_id)
   end
 
-  def message_under_process?
-    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: @processed_params[:messages].first[:id])
-    Redis::Alfred.get(key)
+  def lock_message_source_id!
+    return false if messages_data.blank?
+
+    @message_dedup_lock = Whatsapp::MessageDedupLock.new(messages_data.first[:id])
+    @message_dedup_lock.acquire!
   end
 
-  def cache_message_source_id_in_redis
-    return if @processed_params.try(:[], :messages).blank?
-
-    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: @processed_params[:messages].first[:id])
-    ::Redis::Alfred.setex(key, true)
-  end
-
-  def clear_message_source_id_from_redis
-    key = format(Redis::RedisKeys::MESSAGE_SOURCE_KEY, id: @processed_params[:messages].first[:id])
-    ::Redis::Alfred.delete(key)
+  def release_message_source_id!
+    @message_dedup_lock&.release!
   end
 end

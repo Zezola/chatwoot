@@ -1,5 +1,12 @@
 <script setup>
-import { useTemplateRef, onBeforeUnmount, computed, ref, onMounted } from 'vue';
+import {
+  useTemplateRef,
+  onBeforeUnmount,
+  computed,
+  ref,
+  onMounted,
+  nextTick,
+} from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useTrack } from 'dashboard/composables';
 import { useStore } from 'dashboard/composables/store';
@@ -52,6 +59,9 @@ const canFilterWithoutTeams = computed(() => {
 const canFilterAnyTeam = computed(() => {
   return userACL.value.pode_filtrar_por_qualquer_time;
 });
+const canFilterAnyAssignee = computed(() => {
+  return userACL.value.pode_filtrar_por_qualquer_agente;
+});
 const canFilterWithoutAssignee = computed(() => {
   return userACL.value.pode_filtrar_sem_agente_atribuido;
 });
@@ -64,7 +74,7 @@ const resetFilter = () => {
     filtersToAdd.push({
       attributeKey: 'team_id',
       filterOperator: 'equal_to',
-      values: filters.value[0]?.values || {},
+      values: teamFilterValue(),
       queryOperator: 'and',
     });
   }
@@ -74,7 +84,7 @@ const resetFilter = () => {
     filtersToAdd.push({
       attributeKey: 'assignee_id',
       filterOperator: 'equal_to',
-      values: { id: currentUser.value.id, name: currentUser.value.name },
+      values: assigneeFilterValue(),
       queryOperator: 'and',
     });
   }
@@ -111,19 +121,129 @@ const addFilter = () => {
   filters.value.push({ ...DEFAULT_FILTER });
 };
 
+const teamFilterValue = existingFilter => {
+  const availableTeams = canFilterAnyTeam.value ? allTeams.value : teams.value;
+  const existingTeamId = existingFilter?.values?.id;
+  const existingTeam = availableTeams.find(team => team.id === existingTeamId);
+  const team = existingTeam || availableTeams[0];
+
+  return team ? { id: team.id, name: team.name } : {};
+};
+
+const assigneeFilterValue = () => ({
+  id: currentUser.value.id,
+  name: currentUser.value.name,
+});
+
+const isAclFilterLocked = filter => {
+  if (!filter) return false;
+
+  return (
+    (filter.attributeKey === 'team_id' &&
+      (!canFilterWithoutTeams.value || !canFilterAnyTeam.value)) ||
+    (filter.attributeKey === 'assignee_id' &&
+      (!canFilterWithoutAssignee.value || !canFilterAnyAssignee.value))
+  );
+};
+
+const hasMandatoryAclFilters = () => {
+  return !canFilterWithoutTeams.value || !canFilterWithoutAssignee.value;
+};
+
+const sanitizeRestrictedAclFilter = filter => {
+  if (
+    filter.attributeKey === 'team_id' &&
+    (!canFilterWithoutTeams.value || !canFilterAnyTeam.value)
+  ) {
+    return {
+      ...filter,
+      filterOperator: 'equal_to',
+      values: canFilterAnyTeam.value ? filter.values : teamFilterValue(filter),
+      queryOperator: 'and',
+    };
+  }
+
+  if (
+    filter.attributeKey === 'assignee_id' &&
+    (!canFilterWithoutAssignee.value || !canFilterAnyAssignee.value)
+  ) {
+    return {
+      ...filter,
+      filterOperator: 'equal_to',
+      values: canFilterAnyAssignee.value ? filter.values : assigneeFilterValue(),
+      queryOperator: 'and',
+    };
+  }
+
+  return filter;
+};
+
+const normalizeMandatoryAclFilters = () => {
+  const mandatoryFilters = [];
+  let nextFilters = filters.value.map(sanitizeRestrictedAclFilter);
+
+  if (!canFilterWithoutTeams.value) {
+    const existingTeamFilter = nextFilters.find(
+      filter => filter.attributeKey === 'team_id'
+    );
+    nextFilters = nextFilters.filter(filter => filter.attributeKey !== 'team_id');
+    mandatoryFilters.push({
+      ...existingTeamFilter,
+      attributeKey: 'team_id',
+      filterOperator: 'equal_to',
+      values: teamFilterValue(existingTeamFilter),
+      queryOperator: 'and',
+    });
+  }
+
+  if (!canFilterWithoutAssignee.value) {
+    const existingAssigneeFilter = nextFilters.find(
+      filter => filter.attributeKey === 'assignee_id'
+    );
+    nextFilters = nextFilters.filter(
+      filter => filter.attributeKey !== 'assignee_id'
+    );
+    mandatoryFilters.push({
+      ...existingAssigneeFilter,
+      attributeKey: 'assignee_id',
+      filterOperator: 'equal_to',
+      values:
+        canFilterAnyAssignee.value && existingAssigneeFilter?.values?.id
+          ? existingAssigneeFilter.values
+          : assigneeFilterValue(),
+      queryOperator: 'and',
+    });
+  }
+
+  const normalizedFilters = [...mandatoryFilters, ...nextFilters];
+  normalizedFilters.forEach((filter, index) => {
+    if (index > 0 && (hasMandatoryAclFilters() || isAclFilterLocked(filter))) {
+      normalizedFilters[index - 1].queryOperator = 'and';
+    }
+  });
+
+  filters.value = normalizedFilters;
+};
+
 const conditionsRef = useTemplateRef('conditionsRef');
 
 const isConditionsValid = () => {
   return conditionsRef.value.every(condition => condition.validate());
 };
 
-const updateSavedCustomViews = () => {
+const updateSavedCustomViews = async () => {
+  normalizeMandatoryAclFilters();
+  await nextTick();
+
   if (isConditionsValid()) {
     emit('updateFolder', filters.value, folderNameLocal.value);
   }
 };
 
-function validateAndSubmit() {
+async function validateAndSubmit() {
+  normalizeMandatoryAclFilters();
+  await nextTick();
+
   if (!isConditionsValid()) {
     return;
   }
@@ -148,77 +268,21 @@ const filterModalHeaderTitle = computed(() => {
     : t('FILTER.EDIT_CUSTOM_FILTER');
 });
 
-function ensureTeamFilter() {
-  // Ve se já tem um filtro de team_id
-  const existingTeamFilter = filters.value.find(
-    f => f.attributeKey === 'team_id'
+const isAclConnectorLocked = index => {
+  return (
+    hasMandatoryAclFilters() ||
+    isAclFilterLocked(filters.value[index - 1]) ||
+    isAclFilterLocked(filters.value[index])
   );
-
-  if (!existingTeamFilter) {
-    // Se não existe, adiciona com o primeiro time do usuario
-    const availableTeams = canFilterAnyTeam.value
-      ? allTeams.value
-      : teams.value;
-
-    if (availableTeams.length === 0) {
-      console.warn('Nenhum time disponível');
-    } else {
-      const defaultTeam = {
-        id: availableTeams[0].id,
-        name: availableTeams[0].name,
-      };
-      // Usar unshift para adicionar no início sem substituir o array
-      filters.value.unshift({
-        attributeKey: 'team_id',
-        filterOperator: 'equal_to',
-        values: defaultTeam,
-        queryOperator: 'and',
-      });
-    }
-  } else if (existingTeamFilter && existingTeamFilter !== filters.value[0]) {
-    // Mover team_id para primeira posição
-    const index = filters.value.indexOf(existingTeamFilter);
-    filters.value.splice(index, 1);
-    filters.value.unshift(existingTeamFilter);
-  }
-}
-
-function ensureAssigneeFilter() {
-  const existingAssigneeFilter = filters.value.find(
-    f => f.attributeKey === 'assignee_id'
-  );
-  const userFilter = {
-    attributeKey: 'assignee_id',
-    filterOperator: 'equal_to',
-    values: { id: currentUser.value.id, name: currentUser.value.name },
-    queryOperator: 'and',
-  };
-
-  if (!existingAssigneeFilter) {
-    // se nao existe esse filtro ainda, adiciona como primeiro
-    // Usar unshift para adicionar no início sem substituir o array
-    filters.value.unshift(userFilter);
-  } else if (existingAssigneeFilter !== filters.value[0]) {
-    // Mover assignee_id para primeira posição
-    const index = filters.value.indexOf(existingAssigneeFilter);
-    filters.value.splice(index, 1);
-    filters.value.unshift(userFilter);
-  }
-}
+};
 
 onBeforeUnmount(() => emit('close'));
 onMounted(() => {
   if (filters.value.length === 0) {
     filters.value = [{ ...DEFAULT_FILTER }];
   }
-  // Sempre ter um filtro de times com o valor inicial pro primeiro time do usuário caso nao possa filtrar sem times
-  if (!canFilterWithoutTeams.value) {
-    ensureTeamFilter();
-  }
-  // Sempre ter um filtro de agente atribuido com o valor inicial sendo o usuário logado caso nao possa filtrar sem agente atribuido
-  if (!canFilterWithoutAssignee.value) {
-    ensureAssigneeFilter();
-  }
+
+  normalizeMandatoryAclFilters();
 });
 const outsideClickHandler = [
   () => emit('close'),
@@ -266,6 +330,7 @@ const outsideClickHandler = [
           v-model:values="filter.values"
           show-query-operator
           :filter-types="filterTypes"
+          :force-and-query-operator="isAclConnectorLocked(index)"
           @remove="removeFilter(index)"
         />
       </template>
