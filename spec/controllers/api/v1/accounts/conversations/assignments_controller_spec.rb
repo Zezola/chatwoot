@@ -90,6 +90,69 @@ RSpec.describe 'Conversation Assignment API', type: :request do
         # assignee will be from team
         expect(conversation.reload.assignee).to eq(team_member)
       end
+
+      it 'blocks assignment when Virti ACL denies assignment actions' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: {
+            'pode_ver_menu_de_acoes_da_conversa' => false,
+            'pode_ver_opcoes_de_atribuicao_no_menu_de_contexto' => false
+          }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { assignee_id: agent.id },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:forbidden)
+        expect(conversation.reload.assignee).to be_nil
+      end
+
+      it 'allows assignment when Virti ACL is disabled' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: {
+            'pode_ver_menu_de_acoes_da_conversa' => false,
+            'pode_ver_opcoes_de_atribuicao_no_menu_de_contexto' => false
+          }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        with_modified_env VIRTI_ACL_ENABLED: 'false' do
+          post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+               params: { assignee_id: agent.id },
+               headers: agent.create_new_auth_token,
+               as: :json
+        end
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.reload.assignee).to eq(agent)
+      end
+
+      it 'blocks administrators when their assigned Virti ACL model denies assignment actions' do
+        administrator = create(:user, account: account, role: :administrator)
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: {
+            'pode_ver_menu_de_acoes_da_conversa' => false,
+            'pode_ver_opcoes_de_atribuicao_no_menu_de_contexto' => false
+          }
+        )
+        create(:virti_acl_user_model, account: account, user: administrator, model: model)
+
+        post api_v1_account_conversation_assignments_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { assignee_id: agent.id },
+             headers: administrator.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:forbidden)
+        expect(conversation.reload.assignee).to be_nil
+      end
     end
 
     context 'when it is an authenticated bot with access to the inbox' do

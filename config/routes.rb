@@ -276,6 +276,19 @@ Rails.application.routes.draw do
           end
           resources :labels, only: [:index, :show, :create, :update, :destroy]
 
+          namespace :virti do
+            namespace :acl do
+              get '/', to: 'permissions#index'
+              get 'permission_definitions', to: 'permission_definitions#index'
+              resources :models, only: [:index, :show, :create, :update, :destroy], controller: 'models'
+              scope 'users/:user_id' do
+                resource :model, only: [:show, :update, :destroy], controller: 'user_models'
+              end
+              get ':user_id', to: 'permissions#show'
+              patch ':user_id', to: 'permissions#update'
+            end
+          end
+
           resources :notifications, only: [:index, :update, :destroy] do
             collection do
               post :read_all

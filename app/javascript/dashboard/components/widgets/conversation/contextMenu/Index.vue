@@ -11,6 +11,7 @@ import MenuItem from './menuItem.vue';
 import MenuItemWithSubmenu from './menuItemWithSubmenu.vue';
 import wootConstants from 'dashboard/constants/globals';
 import AgentLoadingPlaceholder from './agentLoadingPlaceholder.vue';
+import { can } from 'dashboard/virti/acl/can';
 
 const MENU = {
   MARK_AS_READ: 'mark-as-read',
@@ -217,6 +218,9 @@ export default {
       // Don't show snooze if the conversation is already snoozed/resolved/pending
       return this.status === wootConstants.STATUS_TYPE.OPEN;
     },
+    canAssignConversation() {
+      return can(this.userACL, 'conversation.assign');
+    },
   },
   mounted() {
     this.$store.dispatch('inboxAssignableAgents/fetch', [this.inboxId]);
@@ -355,7 +359,7 @@ export default {
       <MenuItemWithSubmenu
         v-if="
           isAllowed([MENU.AGENT]) &&
-          userACL.pode_ver_opcoes_de_atribuicao_no_menu_de_contexto
+          canAssignConversation
         "
         :option="agentMenuConfig"
         :sub-menu-available="!!assignableAgents.length"
@@ -374,7 +378,7 @@ export default {
       <MenuItemWithSubmenu
         v-if="
           isAllowed([MENU.TEAM]) &&
-          userACL.pode_ver_opcoes_de_atribuicao_no_menu_de_contexto
+          canAssignConversation
         "
         :option="teamMenuConfig"
         :sub-menu-available="!!teams.length"

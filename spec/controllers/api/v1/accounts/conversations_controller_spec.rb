@@ -171,6 +171,45 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response_data.count).to eq(2)
       end
 
+      it 'does not leak conversations outside Virti ACL scope when filter payload targets another assignee' do
+        other_agent = create(:user, account: account, role: :agent)
+        inbox = agent.inboxes.where(account_id: account.id).first
+        create(:inbox_member, user: other_agent, inbox: inbox)
+        allowed_conversation = create(:conversation, account: account, inbox: inbox, assignee: agent, status: :open)
+        forbidden_conversation = create(:conversation, account: account, inbox: inbox, assignee: other_agent, status: :open)
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        post "/api/v1/accounts/#{account.id}/conversations/filter",
+             headers: agent.create_new_auth_token,
+             params: {
+               payload: [
+                 {
+                   attribute_key: 'status',
+                   filter_operator: 'equal_to',
+                   values: ['open'],
+                   query_operator: 'or'
+                 },
+                 {
+                   attribute_key: 'assignee_id',
+                   filter_operator: 'equal_to',
+                   values: [other_agent.id],
+                   query_operator: nil
+                 }
+               ]
+             },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        conversation_ids = JSON.parse(response.body, symbolize_names: true).fetch(:payload).map { |conversation| conversation[:id] }
+        expect(conversation_ids).to include(allowed_conversation.display_id)
+        expect(conversation_ids).not_to include(forbidden_conversation.display_id)
+      end
+
       it 'returns error if the filters contain invalid attributes' do
         post "/api/v1/accounts/#{account.id}/conversations/filter",
              headers: agent.create_new_auth_token,
@@ -240,6 +279,22 @@ RSpec.describe 'Conversations API', type: :request do
         expect(JSON.parse(response.body, symbolize_names: true)[:id]).to eq(conversation.display_id)
       end
 
+      it 'blocks administrators when their assigned Virti ACL model denies the conversation' do
+        conversation.update!(assignee: create(:user, account: account))
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: administrator, model: model)
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
+            headers: administrator.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:forbidden)
+      end
+
       it 'shows the conversation if you are an agent with access to inbox' do
         create(:inbox_member, user: agent, inbox: conversation.inbox)
         get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
@@ -248,6 +303,59 @@ RSpec.describe 'Conversations API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(JSON.parse(response.body, symbolize_names: true)[:id]).to eq(conversation.display_id)
+      end
+
+      it 'blocks direct access when Virti ACL denies the conversation' do
+        create(:inbox_member, user: agent, inbox: conversation.inbox)
+        conversation.update!(assignee: create(:user, account: account))
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:forbidden)
+      end
+
+      it 'allows direct access to assigned conversations when Virti ACL restricts all conversations' do
+        create(:inbox_member, user: agent, inbox: conversation.inbox)
+        conversation.update!(assignee: agent)
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'does not block direct access when Virti ACL is disabled' do
+        create(:inbox_member, user: agent, inbox: conversation.inbox)
+        conversation.update!(assignee: create(:user, account: account))
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        with_modified_env VIRTI_ACL_ENABLED: 'false' do
+          get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}",
+              headers: agent.create_new_auth_token,
+              as: :json
+        end
+
+        expect(response).to have_http_status(:success)
       end
     end
   end

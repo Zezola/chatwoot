@@ -11,6 +11,11 @@ import { useSidebarKeyboardShortcuts } from './useSidebarKeyboardShortcuts';
 import { vOnClickOutside } from '@vueuse/components';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { useWindowSize, useEventListener } from '@vueuse/core';
+import { can } from 'dashboard/virti/acl/can';
+import {
+  shouldShowAllConversationShortcut,
+  shouldShowMineConversationShortcut,
+} from 'dashboard/virti/acl/sidebar';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import SidebarGroup from './SidebarGroup.vue';
@@ -172,61 +177,70 @@ const exibirAcl = computed(() => {
   return userACL.value?.exibir_acl ?? false;
 });
 
+const userCan = permission => can(userACL.value, permission);
+
 //let partnerUser = ref(false)
 const canSeeKanban = computed(() => {
-  return userACL.value?.pode_ver_menu_kanban ?? true;
+  return userCan('sidebar.kanban');
 });
 
 const canSeeInbox = computed(() => {
-  return userACL.value?.pode_ver_menu_inbox ?? true;
+  return userCan('sidebar.inbox');
 });
 
 const canSeeConversationChannels = computed(() => {
-  return userACL.value?.menu_conversas_exibir_canais ?? true;
+  return userCan('conversation.menu.channels');
 });
 
 const canSeeConversationLabels = computed(() => {
-  return userACL.value?.menu_conversas_exibir_etiquetas ?? true;
+  return userCan('conversation.menu.labels');
 });
 
 const canSeeConversationMentions = computed(() => {
-  return userACL.value?.menu_conversas_exibir_mencoes ?? true;
+  return userCan('conversation.menu.mentions');
 });
 
 const canSeeConversationUnattended = computed(() => {
-  return userACL.value?.menu_conversas_exibir_nao_atendidas ?? true;
+  return userCan('conversation.menu.unattended');
 });
 
 const canSeeConversationTeams = computed(() => {
-  return userACL.value?.menu_conversas_exibir_times ?? true;
+  return userCan('conversation.menu.teams');
 });
 
 const canSeeConversationAll = computed(() => {
-  return userACL.value?.menu_conversas_exibir_todas_conversas ?? true;
+  return (
+    userCan('conversation.menu.all') &&
+    shouldShowAllConversationShortcut(userACL.value)
+  );
+});
+
+const canSeeConversationMine = computed(() => {
+  return shouldShowMineConversationShortcut(userACL.value);
 });
 
 const canSeeContacts = computed(() => {
-  return userACL.value?.pode_ver_menu_contatos ?? true;
+  return userCan('sidebar.contacts');
 });
 
 const canSeeCaptain = computed(() => {
-  return userACL.value?.pode_ver_menu_captain ?? true;
+  return userCan('sidebar.captain');
 });
 
 const canSeePortals = computed(() => {
-  return userACL.value?.pode_ver_menu_portais ?? true;
+  return userCan('sidebar.portals');
 });
 
 const canSeeReports = computed(() => {
-  return userACL.value?.pode_ver_menu_relatorios ?? true;
+  return userCan('sidebar.reports');
 });
 
 const canSeeSettings = computed(() => {
-  return userACL.value?.pode_ver_menu_configuracoes ?? true;
+  return userCan('sidebar.settings');
 });
 
 const canSeeSearchBar = computed(() => {
-  return userACL.value?.pode_ver_barra_de_busca ?? true;
+  return userCan('sidebar.search');
 });
 
 const shouldRedirectToFirstFolder = acl => {
@@ -348,6 +362,12 @@ const menuItems = computed(() => {
       icon: 'i-lucide-message-circle',
       showWhenEmpty: true,
       children: [
+        {
+          name: 'Mine',
+          label: t('CHAT_LIST.ASSIGNEE_TYPE_TABS.me'),
+          activeOn: ['inbox_conversation'],
+          to: accountScopedRoute('home'),
+        },
         {
           name: 'All',
           label: t('SIDEBAR.ALL_CONVERSATIONS'),
@@ -842,6 +862,7 @@ const menuItems = computed(() => {
     if (item.name === 'Inbox') return canSeeInbox.value;
     if (item.name === 'Conversation') {
       item.children = item.children.filter(child => {
+        if (child.name === 'Mine') return canSeeConversationMine.value;
         if (child.name === 'All') return canSeeConversationAll.value;
         if (child.name === 'Mentions') return canSeeConversationMentions.value;
         if (child.name === 'Unattended') {

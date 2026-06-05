@@ -1,57 +1,10 @@
-/* global axios */
-
 import * as types from '../mutation-types';
-import * as MutationHelpers from 'shared/helpers/vuex/mutationHelpers';
 
-import ApiClient from '../../api/ApiClient';
-// Classe para chamarmos a API. TODO: Mudar ela para o proprio arquivo.
-class AclAPI extends ApiClient {
-  constructor() {
-    super('acl', { accountScoped: true });
-  }
-
-  baseUrl() {
-    return ``;
-  }
-
-  get(id) {
-    if (!id) {
-      return axios.get(`${this.url}`);
-    }
-    return axios.get(`${this.url}/${id}`);
-  }
-
-  update(id, data) {
-    return axios.patch(`${this.url}/${id}`, data);
-  }
-}
+import VirtiAclAPI from 'dashboard/virti/acl/api';
+import { DEFAULT_ACL, permissiveAcl } from 'dashboard/virti/acl/defaults';
 
 const state = {
-  currentUserACL: {
-    pode_ver_menu_kanban: true,
-    pode_ver_menu_inbox: true,
-    pode_ver_menu_contatos: true,
-    pode_ver_menu_captain: true,
-    pode_ver_menu_portais: true,
-    pode_ver_menu_relatorios: true,
-    pode_ver_menu_configuracoes: true,
-    pode_ver_barra_de_busca: true,
-    menu_conversas_exibir_canais: true,
-    menu_conversas_exibir_etiquetas: true,
-    menu_conversas_exibir_mencoes: true,
-    menu_conversas_exibir_nao_atendidas: true,
-    menu_conversas_exibir_times: true,
-    menu_conversas_exibir_todas_conversas: true,
-    pode_ver_menu_de_acoes_da_conversa: true,
-    pode_ver_opcoes_de_atribuicao_no_menu_de_contexto: true,
-    pode_filtrar_sem_times: true,
-    pode_filtrar_por_qualquer_time: true,
-    pode_filtrar_sem_agente_atribuido: true,
-    pode_filtrar_por_qualquer_agente: true,
-    pode_ver_aba_de_todas_conversas: true,
-    pode_ver_aba_de_nao_atribuidas: true,
-    nao_redirecionar_para_primeira_pasta: true,
-  },
+  currentUserACL: DEFAULT_ACL,
   editingACL: {},
 };
 
@@ -63,53 +16,24 @@ export const getters = {
 export const actions = {
   fetchAcl: async ({ commit }) => {
     try {
-      const aclapi = new AclAPI();
-      const result = await aclapi.get();
+      const aclapi = new VirtiAclAPI();
+      const result = await aclapi.getCurrent();
       commit(types.default.SET_ACL, { ...result.data, exibir_acl: true });
     } catch (e) {
       console.error(e);
-      commit(types.default.SET_ACL, {
-        pode_ver_menu_kanban: true,
-        pode_ver_menu_inbox: true,
-        pode_ver_menu_contatos: true,
-        pode_ver_menu_captain: true,
-        pode_ver_menu_portais: true,
-        pode_ver_menu_relatorios: true,
-        pode_ver_menu_configuracoes: true,
-        pode_ver_barra_de_busca: true,
-        menu_conversas_exibir_canais: true,
-        menu_conversas_exibir_etiquetas: true,
-        menu_conversas_exibir_mencoes: true,
-        menu_conversas_exibir_nao_atendidas: true,
-        menu_conversas_exibir_times: true,
-        menu_conversas_exibir_todas_conversas: true,
-        pode_ver_menu_de_acoes_da_conversa: true,
-        pode_ver_opcoes_de_atribuicao_no_menu_de_contexto: true,
-        pode_filtrar_sem_times: true,
-        pode_filtrar_por_qualquer_time: true,
-        pode_filtrar_sem_agente_atribuido: true,
-        pode_filtrar_por_qualquer_agente: true,
-        pode_ver_aba_de_todas_conversas: true,
-        pode_ver_aba_de_nao_atribuidas: true,
-        nao_redirecionar_para_primeira_pasta: true,
-        exibir_acl: false,
-      });
+      commit(types.default.SET_ACL, permissiveAcl({ exibir_acl: false }));
     }
   },
 
   fetchEditingAcl: async ({ commit }, userId) => {
-    console.log('CHAMOU A ACTION fetchEditingACL COM USERID = ', userId);
-    const aclapi = new AclAPI();
-    const result = await aclapi.get(userId);
-    console.log({ result });
+    const aclapi = new VirtiAclAPI();
+    const result = await aclapi.getUser(userId);
     commit(types.default.SET_EDITING_ACL, result.data);
   },
 
   updateAcl: async ({ commit }, { userId, newAcl }) => {
-    console.log(`Update ACL chamada com ${userId} e ${JSON.stringify(newAcl)}`);
-    const aclapi = new AclAPI();
-    const result = await aclapi.update(userId, newAcl);
-    console.log({ result });
+    const aclapi = new VirtiAclAPI();
+    await aclapi.updateUser(userId, newAcl);
   },
 };
 
@@ -129,7 +53,6 @@ export const mutations = {
   },
 
   [types.default.UPDATE_ACL]($state, aclData) {
-    console.log('Trocando o state para ', aclData);
     $state.editingACL = { ...aclData };
   },
 };

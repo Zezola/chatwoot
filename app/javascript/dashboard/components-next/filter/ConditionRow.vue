@@ -9,31 +9,16 @@ import SingleSelect from './inputs/SingleSelect.vue';
 
 import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import { validateSingleFilter } from 'dashboard/helper/validations.js';
-import { useMapGetter } from 'dashboard/composables/store';
 
 // filterTypes: import('vue').ComputedRef<FilterType[]>
-const { filterTypes, forceAndQueryOperator } = defineProps({
+const { filterTypes } = defineProps({
   showQueryOperator: { type: Boolean, default: false },
   filterTypes: { type: Array, required: true },
-  forceAndQueryOperator: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['remove']);
 const { t } = useI18n();
 const showErrors = ref(false);
-
-const userACL = useMapGetter('acl/getUserACL');
-const currentUser = useMapGetter('getCurrentUser');
-const canFilterAnyTeam = computed(
-  () => userACL.value.pode_filtrar_por_qualquer_time
-);
-const canFilterAnyAssignee = computed(
-  () => userACL.value.pode_filtrar_por_qualquer_agente
-);
-const canFilterWithoutTeams = computed(() => userACL.value.pode_filtrar_sem_times);
-const canFilterWithoutAssignee = computed(
-  () => userACL.value.pode_filtrar_sem_agente_atribuido
-);
 
 const attributeKey = defineModel('attributeKey', {
   type: String,
@@ -159,68 +144,9 @@ const validate = () => {
   return !validationError.value;
 };
 
-const shouldRestrictTeamFilter = computed(() => {
-  return !canFilterAnyTeam.value;
-});
-
-const shouldRestrictAssigneeFilter = computed(() => {
-  return !canFilterAnyAssignee.value;
-});
-
-const shouldForceTeamOperator = computed(() => {
-  return shouldRestrictTeamFilter.value || !canFilterWithoutTeams.value;
-});
-
-const shouldForceAssigneeOperator = computed(() => {
-  return shouldRestrictAssigneeFilter.value || !canFilterWithoutAssignee.value;
-});
-
-const operatorOptionsPartnerTeam = computed(() => {
-  const operators = currentFilter.value?.filterOperators || [];
-
-  if (shouldForceTeamOperator.value && attributeKey.value === 'team_id') {
-    return operators.filter(op => op.value === 'equal_to');
-  }
-  if (
-    shouldForceAssigneeOperator.value &&
-    attributeKey.value === 'assignee_id'
-  ) {
-    return operators.filter(op => op.value === 'equal_to');
-  }
-  return operators;
-});
-
-// Filter options to only show teams the user is a member of
-const filteredOptions = computed(() => {
-  const options = currentFilter.value?.options || [];
-
-  if (attributeKey.value === 'team_id' && shouldRestrictTeamFilter.value) {
-    return options.filter(team => team.is_member === true);
-  }
-  if (attributeKey.value === 'assignee_id' && shouldRestrictAssigneeFilter.value) {
-    const user = currentUser.value;
-    return user ? [{ id: user.id, name: user.name }] : [];
-  }
-  return options;
-});
-
-const queryOperatorOptionsPartnerUser = [
-  {
-    label: t(`FILTER.QUERY_DROPDOWN_LABELS.AND`),
-    value: 'and',
-    icon: h('span', { class: 'i-lucide-ampersands !text-n-blue-text' }),
-  },
-];
-
 const resetValidation = () => {
   showErrors.value = false;
 };
-
-watch([() => forceAndQueryOperator, queryOperator], () => {
-  if (forceAndQueryOperator && queryOperator.value !== 'and') {
-    queryOperator.value = 'and';
-  }
-});
 
 defineExpose({ validate, resetValidation });
 </script>
@@ -237,11 +163,7 @@ defineExpose({ validate, resetValidation });
         v-model="queryOperator"
         variant="faded"
         class="text-sm"
-        :options="
-          forceAndQueryOperator
-            ? queryOperatorOptionsPartnerUser
-            : queryOperatorOptions
-        "
+        :options="queryOperatorOptions"
       />
 
       <FilterSelect
@@ -254,32 +176,20 @@ defineExpose({ validate, resetValidation });
       <FilterSelect
         v-model="filterOperator"
         variant="ghost"
-        :options="operatorOptionsPartnerTeam"
+        :options="currentFilter?.filterOperators || []"
       />
 
       <template v-if="currentOperator?.hasInput">
         <MultiSelect
           v-if="inputType === 'multiSelect'"
           v-model="values"
-          :options="
-            attributeKey === 'team_id' && shouldRestrictTeamFilter
-              ? filteredOptions
-              : attributeKey === 'assignee_id' && shouldRestrictAssigneeFilter
-                ? filteredOptions
-                : filteredOptions
-          "
+          :options="currentFilter?.options || []"
           dropdown-max-height="max-h-72"
         />
         <SingleSelect
           v-else-if="inputType === 'searchSelect'"
           v-model="values"
-          :options="
-            attributeKey === 'team_id' && shouldRestrictTeamFilter
-              ? filteredOptions
-              : attributeKey === 'assignee_id' && shouldRestrictAssigneeFilter
-                ? filteredOptions
-                : filteredOptions
-          "
+          :options="currentFilter?.options || []"
           dropdown-max-height="max-h-64"
         />
         <SingleSelect

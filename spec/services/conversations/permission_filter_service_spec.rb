@@ -42,6 +42,46 @@ RSpec.describe Conversations::PermissionFilterService do
         expect(result).to include(another_conversation)
         expect(result.count).to eq(2)
       end
+
+      it 'applies Virti ACL conversation scope when ACL is enabled' do
+        conversation.update!(assignee: agent)
+        another_conversation.update!(assignee: create(:user, account: account))
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        result = described_class.new(
+          account.conversations,
+          agent,
+          account
+        ).perform
+
+        expect(result).to contain_exactly(conversation)
+      end
+
+      it 'does not apply Virti ACL conversation scope when ACL is disabled' do
+        conversation.update!(assignee: agent)
+        another_conversation.update!(assignee: create(:user, account: account))
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        with_modified_env VIRTI_ACL_ENABLED: 'false' do
+          result = described_class.new(
+            account.conversations,
+            agent,
+            account
+          ).perform
+
+          expect(result).to include(conversation, another_conversation)
+        end
+      end
     end
   end
 end
