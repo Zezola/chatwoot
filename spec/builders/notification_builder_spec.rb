@@ -131,6 +131,83 @@ describe NotificationBuilder do
         end.to change { admin.notifications.count }.by(1)
       end
 
+      it 'does not create a notification when Virti ACL denies access to the conversation' do
+        restricted_user = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: restricted_user, inbox: inbox)
+        primary_actor.update!(assignee: create(:user, account: account))
+        setting = restricted_user.notification_settings.find_by(account_id: account.id)
+        setting.selected_email_flags = [:email_conversation_creation]
+        setting.selected_push_flags = [:push_conversation_creation]
+        setting.save!
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: restricted_user, model: model)
+
+        expect do
+          described_class.new(
+            notification_type: 'conversation_creation',
+            user: restricted_user,
+            account: account,
+            primary_actor: primary_actor
+          ).perform
+        end.not_to(change { restricted_user.notifications.count })
+      end
+
+      it 'creates a notification when Virti ACL allows access to the conversation' do
+        restricted_user = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: restricted_user, inbox: inbox)
+        primary_actor.update!(assignee: restricted_user)
+        setting = restricted_user.notification_settings.find_by(account_id: account.id)
+        setting.selected_email_flags = [:email_conversation_creation]
+        setting.selected_push_flags = [:push_conversation_creation]
+        setting.save!
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: restricted_user, model: model)
+
+        expect do
+          described_class.new(
+            notification_type: 'conversation_creation',
+            user: restricted_user,
+            account: account,
+            primary_actor: primary_actor
+          ).perform
+        end.to change { restricted_user.notifications.count }.by(1)
+      end
+
+      it 'creates a notification when Virti ACL is disabled' do
+        restricted_user = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: restricted_user, inbox: inbox)
+        primary_actor.update!(assignee: create(:user, account: account))
+        setting = restricted_user.notification_settings.find_by(account_id: account.id)
+        setting.selected_email_flags = [:email_conversation_creation]
+        setting.selected_push_flags = [:push_conversation_creation]
+        setting.save!
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: restricted_user, model: model)
+
+        with_modified_env VIRTI_ACL_ENABLED: 'false' do
+          expect do
+            described_class.new(
+              notification_type: 'conversation_creation',
+              user: restricted_user,
+              account: account,
+              primary_actor: primary_actor
+            ).perform
+          end.to change { restricted_user.notifications.count }.by(1)
+        end
+      end
+
       it 'does not create a notification when the user is not part of the account' do
         unrelated_user = create(:user)
 

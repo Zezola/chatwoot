@@ -70,6 +70,20 @@ RSpec.describe Contact do
       expect(contact.update!(phone_number: '+12312312321')).to be true
       expect(contact.phone_number).to eq '+12312312321'
     end
+
+    it 'normalizes Brazilian mobile phone numbers missing the ninth digit' do
+      contact = create(:contact)
+      expect(contact.update!(phone_number: '+552184655502')).to be true
+      expect(contact.phone_number).to eq '+5521984655502'
+    end
+
+    it 'raises uniqueness error when normalized phone number already exists' do
+      account = create(:account)
+      create(:contact, account: account, phone_number: '+5521984655502')
+      contact = create(:contact, account: account)
+
+      expect { contact.update!(phone_number: '+552184655502') }.to raise_error(ActiveRecord::RecordInvalid)
+    end
   end
 
   context 'when email format' do

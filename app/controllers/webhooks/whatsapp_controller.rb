@@ -96,13 +96,7 @@ class Webhooks::WhatsappController < ActionController::API
   end
 
   def normalized_phone_number(phone_number, force_plus: false)
-    return if phone_number.blank?
-
-    plus = force_plus || phone_number.to_s.start_with?('+') ? '+' : ''
-    digits = phone_number.to_s.gsub(/\D/, '')
-    digits.insert(4, '9') if digits.match?(/\A55\d{10}\z/) && %w[8 9].include?(digits[4])
-
-    "#{plus}#{digits}"
+    Virti::PhoneNumberNormalizer.normalize(phone_number, force_plus: force_plus)
   end
 
   def inactive_whatsapp_number?

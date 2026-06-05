@@ -30,6 +30,7 @@ import {
 } from 'dashboard/composables/useTransformKeys';
 import { useEmitter } from 'dashboard/composables/emitter';
 import { useConversationRequiredAttributes } from 'dashboard/composables/useConversationRequiredAttributes';
+import { can } from 'dashboard/virti/acl/can';
 
 import { emitter } from 'shared/helpers/mitt';
 
@@ -184,8 +185,8 @@ const assigneeTabItems = computed(() => {
     count: conversationStats.value[countKey] || 0,
   }));
 
-  const canViewAll = userACL.value.pode_ver_aba_de_todas_conversas;
-  const canViewUnassigned = userACL.value.pode_ver_aba_de_nao_atribuidas;
+  const canViewAll = can(userACL.value, 'conversation.view_all');
+  const canViewUnassigned = can(userACL.value, 'conversation.view_unassigned');
   return allTabs.filter(tab => {
     if (tab.key === wootConstants.ASSIGNEE_TYPE.ALL) return canViewAll;
     if (tab.key === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {

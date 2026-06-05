@@ -76,6 +76,24 @@ describe Messages::NewMessageNotificationService do
                                                          account: account, primary_actor: message.conversation,
                                                          secondary_actor: message)).to exist
       end
+
+      it 'does not create notifications for participants blocked by Virti ACL' do
+        blocked_agent = participating_agent_2
+        conversation.update!(assignee: assignee)
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: blocked_agent, model: model)
+
+        blocked_agent.notifications.destroy_all
+        described_class.new(message: message).perform
+
+        expect(blocked_agent.notifications.where(notification_type: 'participating_conversation_new_message',
+                                                 account: account, primary_actor: message.conversation,
+                                                 secondary_actor: message)).not_to exist
+      end
     end
 
     context 'when multiple notification conditions are met' do

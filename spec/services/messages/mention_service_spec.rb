@@ -137,6 +137,31 @@ describe Messages::MentionService do
 
         expect(participant_user_ids_when_notified).to include(first_agent.id)
       end
+
+      it 'does not persist notifications for mentioned users blocked by Virti ACL' do
+        conversation.update!(assignee: user)
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: first_agent, model: model)
+        allow(NotificationBuilder).to receive(:new).and_call_original
+        message = create(
+          :message,
+          conversation: conversation,
+          account: account,
+          content: "hi (mention://user/#{first_agent.id}/#{first_agent.name})",
+          private: true,
+          sender: user
+        )
+
+        described_class.new(message: message).perform
+
+        expect(first_agent.notifications.where(notification_type: 'conversation_mention',
+                                               account: account, primary_actor: message.conversation,
+                                               secondary_actor: message)).not_to exist
+      end
     end
 
     context 'when message contains multiple user mentions' do

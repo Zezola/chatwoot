@@ -94,4 +94,40 @@ RSpec.describe NotificationFinder do
       end
     end
   end
+
+  describe 'Virti ACL filtering' do
+    let(:inbox) { create(:inbox, account: account) }
+    let(:other_user) { create(:user, account: account) }
+    let(:allowed_conversation) { create(:conversation, account: account, inbox: inbox, assignee: user) }
+    let(:blocked_conversation) { create(:conversation, account: account, inbox: inbox, assignee: other_user) }
+    let!(:allowed_notification) { create(:notification, account: account, user: user, primary_actor: allowed_conversation) }
+    let!(:blocked_notification) { create(:notification, account: account, user: user, primary_actor: blocked_conversation) }
+    let(:params) { {} }
+
+    before do
+      model = create(
+        :virti_acl_model,
+        account: account,
+        permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+      )
+      create(:virti_acl_user_model, account: account, user: user, model: model)
+    end
+
+    it 'does not return notifications for conversations blocked by Virti ACL' do
+      expect(notification_finder.notifications).to include(allowed_notification)
+      expect(notification_finder.notifications).not_to include(blocked_notification)
+    end
+
+    it 'does not count unread notifications blocked by Virti ACL' do
+      expect(notification_finder.unread_count).to eq(1)
+    end
+
+    it 'returns blocked notifications when Virti ACL is disabled' do
+      with_modified_env VIRTI_ACL_ENABLED: 'false' do
+        finder = described_class.new(user, account, params)
+
+        expect(finder.notifications).to include(blocked_notification)
+      end
+    end
+  end
 end

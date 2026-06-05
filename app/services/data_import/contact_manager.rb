@@ -45,7 +45,7 @@ class DataImport::ContactManager
   end
 
   def format_phone_number(phone_number)
-    phone_number.start_with?('+') ? phone_number : "+#{phone_number}"
+    Virti::PhoneNumberNormalizer.normalize(phone_number, force_plus: true)
   end
 
   def update_contact_with_merged_attributes(params, contact)
