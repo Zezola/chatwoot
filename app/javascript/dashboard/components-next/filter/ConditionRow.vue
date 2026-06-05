@@ -12,9 +12,10 @@ import { validateSingleFilter } from 'dashboard/helper/validations.js';
 import { useMapGetter } from 'dashboard/composables/store';
 
 // filterTypes: import('vue').ComputedRef<FilterType[]>
-const { filterTypes, partnerFilter } = defineProps({
+const { filterTypes, forceAndQueryOperator } = defineProps({
   showQueryOperator: { type: Boolean, default: false },
   filterTypes: { type: Array, required: true },
+  forceAndQueryOperator: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['remove']);
@@ -28,6 +29,10 @@ const canFilterAnyTeam = computed(
 );
 const canFilterAnyAssignee = computed(
   () => userACL.value.pode_filtrar_por_qualquer_agente
+);
+const canFilterWithoutTeams = computed(() => userACL.value.pode_filtrar_sem_times);
+const canFilterWithoutAssignee = computed(
+  () => userACL.value.pode_filtrar_sem_agente_atribuido
 );
 
 const attributeKey = defineModel('attributeKey', {
@@ -60,12 +65,12 @@ const currentFilter = computed(() =>
 );
 
 const getOperator = (filter, selectedOperator) => {
-  const operatorFromOptions = filter.filterOperators.find(
+  const operatorFromOptions = filter?.filterOperators?.find(
     operator => operator.value === selectedOperator
   );
 
   if (!operatorFromOptions) {
-    return filter.filterOperators[0];
+    return filter?.filterOperators?.[0];
   }
 
   return operatorFromOptions;
@@ -76,7 +81,7 @@ const currentOperator = computed(() =>
 );
 
 const getInputType = (operator, filter) =>
-  operator.inputOverride ?? filter.inputType;
+  operator?.inputOverride ?? filter?.inputType;
 
 const inputType = computed(() =>
   getInputType(currentOperator.value, currentFilter.value)
@@ -87,12 +92,12 @@ const queryOperatorOptions = computed(() => {
     {
       label: t(`FILTER.QUERY_DROPDOWN_LABELS.AND`),
       value: 'and',
-      icon: h('span', { class: 'i-lucide-ampersands !text-n-blue-text' }),
+      icon: h('span', { class: 'i-lucide-ampersands !text-n-blue-11' }),
     },
     {
       label: t(`FILTER.QUERY_DROPDOWN_LABELS.OR`),
       value: 'or',
-      icon: h('span', { class: 'i-woot-logic-or !text-n-blue-text' }),
+      icon: h('span', { class: 'i-woot-logic-or !text-n-blue-11' }),
     },
   ];
 });
@@ -129,6 +134,12 @@ const resetModelOnAttributeKeyChange = newAttributeKey => {
   const filter = getFilterFromFilterTypes(newAttributeKey);
   const newOperator = getOperator(filter, filterOperator.value);
   const newInputType = getInputType(newOperator, filter);
+
+  if (!newOperator) {
+    values.value = '';
+    return;
+  }
+
   if (newInputType === 'multiSelect') {
     values.value = [];
   } else if (['searchSelect', 'booleanSelect'].includes(newInputType)) {
@@ -156,33 +167,41 @@ const shouldRestrictAssigneeFilter = computed(() => {
   return !canFilterAnyAssignee.value;
 });
 
+const shouldForceTeamOperator = computed(() => {
+  return shouldRestrictTeamFilter.value || !canFilterWithoutTeams.value;
+});
+
+const shouldForceAssigneeOperator = computed(() => {
+  return shouldRestrictAssigneeFilter.value || !canFilterWithoutAssignee.value;
+});
+
 const operatorOptionsPartnerTeam = computed(() => {
-  if (shouldRestrictTeamFilter.value && attributeKey.value === 'team_id') {
-    return currentFilter.value.filterOperators.filter(
-      op => op.value === 'equal_to'
-    );
+  const operators = currentFilter.value?.filterOperators || [];
+
+  if (shouldForceTeamOperator.value && attributeKey.value === 'team_id') {
+    return operators.filter(op => op.value === 'equal_to');
   }
   if (
-    shouldRestrictAssigneeFilter.value &&
+    shouldForceAssigneeOperator.value &&
     attributeKey.value === 'assignee_id'
   ) {
-    return currentFilter.value.filterOperators.filter(
-      op => op.value === 'equal_to'
-    );
+    return operators.filter(op => op.value === 'equal_to');
   }
-  return currentFilter.value.filterOperators;
+  return operators;
 });
 
 // Filter options to only show teams the user is a member of
 const filteredOptions = computed(() => {
-  if (attributeKey.value === 'team_id') {
-    return currentFilter.value.options.filter(team => team.is_member === true);
+  const options = currentFilter.value?.options || [];
+
+  if (attributeKey.value === 'team_id' && shouldRestrictTeamFilter.value) {
+    return options.filter(team => team.is_member === true);
   }
-  if (attributeKey.value === 'assignee_id') {
+  if (attributeKey.value === 'assignee_id' && shouldRestrictAssigneeFilter.value) {
     const user = currentUser.value;
     return user ? [{ id: user.id, name: user.name }] : [];
   }
-  return currentFilter.value.options;
+  return options;
 });
 
 const queryOperatorOptionsPartnerUser = [
@@ -193,7 +212,17 @@ const queryOperatorOptionsPartnerUser = [
   },
 ];
 
-defineExpose({ validate });
+const resetValidation = () => {
+  showErrors.value = false;
+};
+
+watch([() => forceAndQueryOperator, queryOperator], () => {
+  if (forceAndQueryOperator && queryOperator.value !== 'and') {
+    queryOperator.value = 'and';
+  }
+});
+
+defineExpose({ validate, resetValidation });
 </script>
 <template>
   <li class="list-none">
@@ -209,7 +238,7 @@ defineExpose({ validate });
         variant="faded"
         class="text-sm"
         :options="
-          shouldRestrictTeamFilter && attributeKey === 'team_id'
+          forceAndQueryOperator
             ? queryOperatorOptionsPartnerUser
             : queryOperatorOptions
         "
@@ -228,7 +257,7 @@ defineExpose({ validate });
         :options="operatorOptionsPartnerTeam"
       />
 
-      <template v-if="currentOperator.hasInput">
+      <template v-if="currentOperator?.hasInput">
         <MultiSelect
           v-if="inputType === 'multiSelect'"
           v-model="values"
@@ -237,8 +266,9 @@ defineExpose({ validate });
               ? filteredOptions
               : attributeKey === 'assignee_id' && shouldRestrictAssigneeFilter
                 ? filteredOptions
-                : currentFilter.options
+                : filteredOptions
           "
+          dropdown-max-height="max-h-72"
         />
         <SingleSelect
           v-else-if="inputType === 'searchSelect'"
@@ -248,8 +278,9 @@ defineExpose({ validate });
               ? filteredOptions
               : attributeKey === 'assignee_id' && shouldRestrictAssigneeFilter
                 ? filteredOptions
-                : currentFilter.options
+                : filteredOptions
           "
+          dropdown-max-height="max-h-64"
         />
         <SingleSelect
           v-else-if="inputType === 'booleanSelect'"

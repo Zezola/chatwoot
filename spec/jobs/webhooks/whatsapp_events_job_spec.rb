@@ -136,6 +136,55 @@ RSpec.describe Webhooks::WhatsappEventsJob do
       job.perform_now(wb_params)
     end
 
+    it 'finds whatsapp cloud channel by phone number id when the display phone number format does not match' do
+      other_channel = create(:channel_whatsapp, phone_number: '+5511995557780', provider: 'whatsapp_cloud', sync_templates: false,
+                                                validate_provider_config: false)
+      wb_params = {
+        phone_number: channel.phone_number,
+        object: 'whatsapp_business_account',
+        entry: [{
+          changes: [{
+            value: {
+              metadata: {
+                phone_number_id: other_channel.provider_config['phone_number_id'],
+                display_phone_number: '551195557780'
+              }
+            }
+          }]
+        }]
+      }
+
+      allow(Whatsapp::IncomingMessageWhatsappCloudService).to receive(:new).and_return(process_service)
+      expect(Whatsapp::IncomingMessageWhatsappCloudService).to receive(:new).with(
+        inbox: other_channel.inbox,
+        params: wb_params
+      )
+      job.perform_now(wb_params)
+    end
+
+    it 'falls back to the webhook URL phone number when phone number id is not present' do
+      wb_params = {
+        phone_number: channel.phone_number,
+        object: 'whatsapp_business_account',
+        entry: [{
+          changes: [{
+            value: {
+              metadata: {
+                display_phone_number: '551195557780'
+              }
+            }
+          }]
+        }]
+      }
+
+      allow(Whatsapp::IncomingMessageWhatsappCloudService).to receive(:new).and_return(process_service)
+      expect(Whatsapp::IncomingMessageWhatsappCloudService).to receive(:new).with(
+        inbox: channel.inbox,
+        params: wb_params
+      )
+      job.perform_now(wb_params)
+    end
+
     it 'Ignore reaction type message and stop raising error' do
       other_channel = create(:channel_whatsapp, phone_number: '+1987654', provider: 'whatsapp_cloud', sync_templates: false,
                                                 validate_provider_config: false)
@@ -239,7 +288,7 @@ RSpec.describe Webhooks::WhatsappEventsJob do
         ]
       }
       allow(Whatsapp::IncomingMessageWhatsappCloudService).to receive(:new).and_return(process_service)
-      expect(Whatsapp::IncomingMessageWhatsappCloudService).not_to receive(:new).with(inbox: other_channel.inbox, params: wb_params)
+      expect(Whatsapp::IncomingMessageWhatsappCloudService).not_to receive(:new)
       job.perform_now(wb_params)
     end
   end

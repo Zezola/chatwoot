@@ -12,10 +12,14 @@ import { downloadFile } from '@chatwoot/utils';
 import { useEmitter } from 'dashboard/composables/emitter';
 import { emitter } from 'shared/helpers/mitt';
 
-const { attachment, isPrivate } = defineProps({
+const { attachment, isPrivate, showTranscribedText } = defineProps({
   attachment: {
     type: Object,
     required: true,
+  },
+  showTranscribedText: {
+    type: Boolean,
+    default: true,
   },
   isPrivate: {
     type: Boolean,
@@ -195,7 +199,7 @@ const downloadAudio = async () => {
     </div>
 
     <div
-      v-if="transcribedText"
+      v-if="transcribedText && showTranscribedText"
       class="p-3 text-sm rounded-lg w-full break-words"
       :class="
         isPrivate
