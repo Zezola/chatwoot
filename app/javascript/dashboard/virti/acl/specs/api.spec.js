@@ -43,4 +43,19 @@ describe('#VirtiAclAPI', () => {
       permissions: { pode_ver_menu_kanban: false },
     });
   });
+
+  it('removes response metadata when updating through the Rails endpoint', () => {
+    window.history.pushState({}, '', '/app/accounts/2/dashboard');
+
+    new VirtiAclAPI().updateUser(10, {
+      pode_ver_menu_kanban: false,
+      aclSource: 'individual',
+      model: null,
+      userId: 10,
+    });
+
+    expect(axiosMock.patch).toHaveBeenCalledWith('/api/v1/accounts/2/virti/acl/10', {
+      permissions: { pode_ver_menu_kanban: false },
+    });
+  });
 });

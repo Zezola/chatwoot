@@ -1,6 +1,19 @@
 /* global axios */
 
 import ApiClient from 'dashboard/api/ApiClient';
+import { DEFAULT_ACL } from './defaults';
+
+const permissionKeys = Object.keys(DEFAULT_ACL);
+
+const sanitizedPermissions = permissions => {
+  const source = permissions || {};
+  return permissionKeys.reduce((sanitized, key) => {
+    if (typeof source[key] === 'boolean') {
+      sanitized[key] = source[key];
+    }
+    return sanitized;
+  }, {});
+};
 
 class LegacyAclAPI extends ApiClient {
   constructor() {
@@ -30,7 +43,9 @@ class AccountScopedAclAPI extends ApiClient {
   }
 
   updateUser(userId, permissions) {
-    return axios.patch(`${this.url}/${userId}`, { permissions });
+    return axios.patch(`${this.url}/${userId}`, {
+      permissions: sanitizedPermissions(permissions),
+    });
   }
 
   getModels() {
