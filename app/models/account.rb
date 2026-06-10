@@ -101,6 +101,8 @@ class Account < ApplicationRecord
   has_many :working_hours, dependent: :destroy_async
   has_many :virti_acl_models, class_name: 'Virti::Acl::Model', dependent: :destroy_async
   has_many :virti_acl_user_models, class_name: 'Virti::Acl::UserModel', dependent: :destroy_async
+  has_many :virti_kanban_models, class_name: 'Virti::Kanban::Model', dependent: :destroy_async
+  has_many :virti_kanban_user_models, class_name: 'Virti::Kanban::UserModel', dependent: :destroy_async
 
   has_one_attached :contacts_export
 

@@ -287,6 +287,18 @@ Rails.application.routes.draw do
               get ':user_id', to: 'permissions#show'
               patch ':user_id', to: 'permissions#update'
             end
+
+            namespace :kanban do
+              get '/', to: 'boards#show'
+              resources :models, only: [:index, :show, :create, :update, :destroy], controller: 'models'
+              get 'models/:model_id/cards', to: 'cards#index'
+              post 'models/:model_id/cards/move', to: 'cards#move'
+              get 'user_models', to: 'user_models#index'
+              scope 'users/:user_id' do
+                resource :model, only: [:show, :update, :destroy], controller: 'user_models'
+              end
+              get 'users/:user_id', to: 'boards#show_user'
+            end
           end
 
           resources :notifications, only: [:index, :update, :destroy] do

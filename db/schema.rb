@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_27_000200) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_10_000100) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1328,6 +1328,37 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_27_000200) do
     t.index ["user_id"], name: "index_virti_acl_user_models_on_user_id"
   end
 
+  create_table "virti_kanban_models", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.jsonb "configuration", default: {}, null: false
+    t.bigint "created_by_id"
+    t.bigint "updated_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "name"], name: "index_virti_kanban_models_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_virti_kanban_models_on_account_id"
+    t.index ["created_by_id"], name: "index_virti_kanban_models_on_created_by_id"
+    t.index ["updated_by_id"], name: "index_virti_kanban_models_on_updated_by_id"
+  end
+
+  create_table "virti_kanban_user_models", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "model_id", null: false
+    t.bigint "created_by_id"
+    t.bigint "updated_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "user_id"], name: "index_virti_kanban_user_models_on_account_id_and_user_id", unique: true
+    t.index ["account_id"], name: "index_virti_kanban_user_models_on_account_id"
+    t.index ["created_by_id"], name: "index_virti_kanban_user_models_on_created_by_id"
+    t.index ["model_id"], name: "index_virti_kanban_user_models_on_model_id"
+    t.index ["updated_by_id"], name: "index_virti_kanban_user_models_on_updated_by_id"
+    t.index ["user_id"], name: "index_virti_kanban_user_models_on_user_id"
+  end
+
   create_table "webhooks", force: :cascade do |t|
     t.integer "account_id"
     t.integer "inbox_id"
@@ -1369,6 +1400,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_27_000200) do
   add_foreign_key "virti_acl_user_models", "users", column: "created_by_id"
   add_foreign_key "virti_acl_user_models", "users", column: "updated_by_id"
   add_foreign_key "virti_acl_user_models", "virti_acl_models", column: "model_id"
+  add_foreign_key "virti_kanban_models", "accounts"
+  add_foreign_key "virti_kanban_models", "users", column: "created_by_id"
+  add_foreign_key "virti_kanban_models", "users", column: "updated_by_id"
+  add_foreign_key "virti_kanban_user_models", "accounts"
+  add_foreign_key "virti_kanban_user_models", "users"
+  add_foreign_key "virti_kanban_user_models", "users", column: "created_by_id"
+  add_foreign_key "virti_kanban_user_models", "users", column: "updated_by_id"
+  add_foreign_key "virti_kanban_user_models", "virti_kanban_models", column: "model_id"
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").
       after(:insert).

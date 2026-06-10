@@ -33,6 +33,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       'conversation.read': this.onConversationRead,
       'conversation.updated': this.onConversationUpdated,
       'conversation.removed_from_scope': this.onConversationRemovedFromScope,
+      'virti.kanban.updated': this.onKanbanUpdated,
       'account.cache_invalidated': this.onCacheInvalidate,
       'account.enrichment_completed': this.onEnrichmentCompleted,
       'copilot.message.created': this.onCopilotMessageCreated,
@@ -127,6 +128,11 @@ class ActionCableConnector extends BaseActionCableConnector {
       this.app.$store.dispatch('removeConversationFromScope', id);
     }
     this.fetchConversationStats();
+  };
+
+  // eslint-disable-next-line class-methods-use-this
+  onKanbanUpdated = data => {
+    emitter.emit(BUS_EVENTS.KANBAN_UPDATED, data);
   };
 
   onTypingOn = ({ conversation, user }) => {
