@@ -360,6 +360,17 @@ const actions = {
     }
   },
 
+  removeConversationFromScope: ({ commit, dispatch, state }, conversationId) => {
+    const removedActiveConversation =
+      Number(state.selectedChatId) === Number(conversationId);
+
+    commit(types.DELETE_CONVERSATION, Number(conversationId));
+    if (removedActiveConversation) {
+      commit(types.CLEAR_CURRENT_CHAT_WINDOW);
+    }
+    dispatch('conversationStats/get', {}, { root: true });
+  },
+
   addConversation({ commit, state, dispatch, rootState }, conversation) {
     const { currentInbox, appliedFilters } = state;
     const {

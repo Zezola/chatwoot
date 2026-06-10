@@ -23,4 +23,7 @@ Rails.application.config.to_prepare do
 
   action_cable_broadcast_job_patch = Virti::Acl::Patches::ActionCableBroadcastJobPatch
   ActionCableBroadcastJob.prepend(action_cable_broadcast_job_patch) unless ActionCableBroadcastJob.ancestors.include?(action_cable_broadcast_job_patch)
+
+  action_cable_listener_patch = Virti::Acl::Patches::ActionCableListenerPatch
+  ActionCableListener.prepend(action_cable_listener_patch) unless ActionCableListener.ancestors.include?(action_cable_listener_patch)
 end
