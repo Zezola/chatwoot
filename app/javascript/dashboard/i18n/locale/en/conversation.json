@@ -90,7 +90,7 @@
     "HEADER": {
       "RESOLVE_ACTION": "Resolve",
       "REOPEN_ACTION": "Reopen",
-      "OPEN_ACTION": "Open",
+      "OPEN_ACTION": "Take from AI",
       "MORE_ACTIONS": "More actions",
       "OPEN": "More",
       "CLOSE": "Close",
@@ -109,7 +109,7 @@
       }
     },
     "RESOLVE_DROPDOWN": {
-      "MARK_PENDING": "Mark as pending",
+      "MARK_PENDING": "Return to AI",
       "SNOOZE_UNTIL": "Snooze",
       "SNOOZE": {
         "TITLE": "Snooze until",

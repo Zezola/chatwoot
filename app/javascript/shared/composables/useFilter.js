@@ -96,16 +96,19 @@ export const useFilter = ({ filteri18nKey, attributeModel }) => {
     activeAssigneeTab
   ) => {
     if (activeStatus !== '') {
+      const values =
+        activeStatus === wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED
+          ? wootConstants.ACTIVE_CONVERSATION_STATUS_TYPES
+          : [activeStatus];
+
       return {
         attribute_key: 'status',
         attribute_model: 'standard',
         filter_operator: 'equal_to',
-        values: [
-          {
-            id: activeStatus,
-            name: $t(`CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.${activeStatus}.TEXT`),
-          },
-        ],
+        values: values.map(status => ({
+          id: status,
+          name: $t(`CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.${status}.TEXT`),
+        })),
         query_operator: 'and',
         custom_attribute_type: '',
       };

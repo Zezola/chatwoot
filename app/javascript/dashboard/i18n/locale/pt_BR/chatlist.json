@@ -20,6 +20,9 @@
       "all": "Todos"
     },
     "CHAT_STATUS_FILTER_ITEMS": {
+      "open_pending_snoozed": {
+        "TEXT": "Abertas, pendentes e adiadas"
+      },
       "open": {
         "TEXT": "Abertas"
       },

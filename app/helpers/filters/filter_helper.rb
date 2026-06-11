@@ -97,7 +97,8 @@ module Filters::FilterHelper
   def conversation_status_values(values)
     return Conversation.statuses.values if values.include?('all')
 
-    values.map { |x| Conversation.statuses[x.to_sym] }
+    status_values = values.flat_map { |value| value == 'open_pending_snoozed' ? %w[open pending snoozed] : value }.uniq
+    status_values.map { |x| Conversation.statuses[x.to_sym] }
   end
 
   def conversation_priority_values(values)

@@ -9,7 +9,15 @@ import wootConstants from 'dashboard/constants/globals';
 import SelectMenu from 'dashboard/components-next/selectmenu/SelectMenu.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
-defineProps({
+const props = defineProps({
+  activeAssigneeTab: {
+    type: String,
+    required: true,
+  },
+  activeStatus: {
+    type: String,
+    required: true,
+  },
   isOnExpandedLayout: {
     type: Boolean,
     required: true,
@@ -21,7 +29,7 @@ const emit = defineEmits(['changeFilter']);
 const store = useStore();
 const { t } = useI18n();
 
-const { updateUISettings } = useUISettings();
+const { uiSettings, updateUISettings } = useUISettings();
 
 const chatStatusFilter = useMapGetter('getChatStatusFilter');
 const chatSortFilter = useMapGetter('getChatSortFilter');
@@ -29,7 +37,7 @@ const chatSortFilter = useMapGetter('getChatSortFilter');
 const [showActionsDropdown, toggleDropdown] = useToggle();
 
 const currentStatusFilter = computed(() => {
-  return chatStatusFilter.value || wootConstants.STATUS_TYPE.ALL;
+  return chatStatusFilter.value || props.activeStatus;
 });
 
 const currentSortBy = computed(() => {
@@ -38,28 +46,42 @@ const currentSortBy = computed(() => {
   );
 });
 
-const chatStatusOptions = computed(() => [
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open.TEXT'),
-    value: 'open',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.resolved.TEXT'),
-    value: 'resolved',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.pending.TEXT'),
-    value: 'pending',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.snoozed.TEXT'),
-    value: 'snoozed',
-  },
-  {
-    label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.all.TEXT'),
-    value: 'all',
-  },
-]);
+const chatStatusOptions = computed(() => {
+  const options = [
+    {
+      label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open.TEXT'),
+      value: 'open',
+    },
+    {
+      label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.resolved.TEXT'),
+      value: 'resolved',
+    },
+    {
+      label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.pending.TEXT'),
+      value: 'pending',
+    },
+    {
+      label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.snoozed.TEXT'),
+      value: 'snoozed',
+    },
+    {
+      label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.all.TEXT'),
+      value: 'all',
+    },
+  ];
+
+  if (props.activeAssigneeTab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    return [
+      {
+        label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open_pending_snoozed.TEXT'),
+        value: 'open_pending_snoozed',
+      },
+      ...options,
+    ];
+  }
+
+  return options;
+});
 
 const chatSortOptions = computed(() => [
   {
@@ -102,7 +124,7 @@ const chatSortOptions = computed(() => [
 
 const activeChatStatusLabel = computed(
   () =>
-    chatStatusOptions.value.find(m => m.value === chatStatusFilter.value)
+    chatStatusOptions.value.find(m => m.value === currentStatusFilter.value)
       ?.label || ''
 );
 
@@ -113,9 +135,17 @@ const activeChatSortLabel = computed(
 );
 
 const saveSelectedFilter = (type, value) => {
+  const filterBy = uiSettings.value.conversations_filter_by || {};
+  const statusByAssigneeType = {
+    ...(filterBy.status_by_assignee_type || {}),
+    [props.activeAssigneeTab]:
+      type === 'status' ? value : currentStatusFilter.value,
+  };
+
   updateUISettings({
     conversations_filter_by: {
-      status: type === 'status' ? value : currentStatusFilter.value,
+      ...filterBy,
+      status_by_assignee_type: statusByAssigneeType,
       order_by: type === 'sort' ? value : currentSortBy.value,
     },
   });

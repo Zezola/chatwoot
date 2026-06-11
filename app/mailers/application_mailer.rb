@@ -1,4 +1,6 @@
 class ApplicationMailer < ActionMailer::Base
+  VIRTI_DEFAULT_LOCALE = 'pt_BR'.freeze
+
   include ActionView::Helpers::SanitizeHelper
 
   default from: ENV.fetch('MAILER_SENDER_EMAIL', 'Chatwoot <accounts@chatwoot.com>')
@@ -75,10 +77,8 @@ class ApplicationMailer < ActionMailer::Base
   end
 
   def switch_locale(&)
-    locale ||= locale_from_account(Current.account)
-    locale ||= I18n.default_locale
-    # ensure locale won't bleed into other requests
-    # https://guides.rubyonrails.org/i18n.html#managing-the-locale-across-requests
-    I18n.with_locale(locale, &)
+    # Virti: outbound emails must be sent in Brazilian Portuguese, including
+    # Devise/reset emails where Current.account may be absent.
+    I18n.with_locale(VIRTI_DEFAULT_LOCALE, &)
   end
 end

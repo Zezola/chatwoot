@@ -31,12 +31,18 @@ RSpec.describe AccountBuilder do
         expect(account.name).to eq(account_name)
       end
 
+      it 'creates the account with pt_BR locale' do
+        _user, account = account_builder.perform
+        expect(account.locale).to eq('pt_BR')
+      end
+
       it 'creates a new confirmed user with correct details' do
         user, _account = account_builder.perform
         expect(user).to be_a(User)
         expect(user.email).to eq(email)
         expect(user.name).to eq(user_full_name)
         expect(user.confirmed?).to be(true)
+        expect(user.ui_settings['locale']).to eq('pt_BR')
       end
 
       it 'links user to account as administrator' do

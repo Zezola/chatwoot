@@ -12,6 +12,7 @@ const props = defineProps({
   pageTitle: { type: String, required: true },
   hasAppliedFilters: { type: Boolean, required: true },
   hasActiveFolders: { type: Boolean, required: true },
+  activeAssigneeTab: { type: String, required: true },
   activeStatus: { type: String, required: true },
   isOnExpandedLayout: { type: Boolean, required: true },
   conversationStats: { type: Object, required: true },
@@ -156,6 +157,8 @@ const toggleConversationLayout = () => {
       </div>
       <ConversationBasicFilter
         v-if="!hasAppliedFiltersOrActiveFolders"
+        :active-assignee-tab="activeAssigneeTab"
+        :active-status="activeStatus"
         :is-on-expanded-layout="isOnExpandedLayout"
         @change-filter="onBasicFilterChange"
       />

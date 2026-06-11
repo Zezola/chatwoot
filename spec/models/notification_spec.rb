@@ -24,14 +24,12 @@ RSpec.describe Notification do
   context 'when push_title is called' do
     it 'returns appropriate title suited for the notification type conversation_creation' do
       notification = create(:notification, notification_type: 'conversation_creation')
-      expect(notification.push_message_title).to eq "A conversation (##{notification.primary_actor.display_id}) \
-has been created in #{notification.primary_actor.inbox.name}"
+      expect(notification.push_message_title).to eq "Nova conversa de #{notification.primary_actor.contact.name} (##{notification.primary_actor.display_id})"
     end
 
     it 'returns appropriate title suited for the notification type conversation_assignment' do
       notification = create(:notification, notification_type: 'conversation_assignment')
-      expect(notification.push_message_title).to eq "A conversation (##{notification.primary_actor.display_id}) \
-has been assigned to you"
+      expect(notification.push_message_title).to eq "Nova conversa de #{notification.primary_actor.contact.name} (##{notification.primary_actor.display_id})"
     end
 
     it 'returns appropriate title suited for the notification type assigned_conversation_new_message' do
@@ -39,7 +37,7 @@ has been assigned to you"
       notification = create(:notification, notification_type: 'assigned_conversation_new_message', primary_actor: message.conversation,
                                            secondary_actor: message)
 
-      expect(notification.push_message_title).to eq "A new message is created in conversation (##{notification.primary_actor.display_id})"
+      expect(notification.push_message_title).to eq "#{message.sender.name} (##{notification.primary_actor.display_id}) enviou uma nova mensagem"
     end
 
     it 'returns appropriate title suited for the notification type assigned_conversation_new_message when attachment message' do
@@ -48,7 +46,7 @@ has been assigned to you"
       notification = create(:notification, notification_type: 'assigned_conversation_new_message', primary_actor: message.conversation,
                                            secondary_actor: message)
 
-      expect(notification.push_message_title).to eq "A new message is created in conversation (##{notification.primary_actor.display_id})"
+      expect(notification.push_message_title).to eq "#{message.sender.name} (##{notification.primary_actor.display_id}) enviou uma nova mensagem"
     end
 
     it 'returns appropriate title suited for the notification type participating_conversation_new_message' do
@@ -56,7 +54,7 @@ has been assigned to you"
       notification = create(:notification, notification_type: 'participating_conversation_new_message', primary_actor: message.conversation,
                                            secondary_actor: message)
 
-      expect(notification.push_message_title).to eq "A new message is created in conversation (##{notification.primary_actor.display_id})"
+      expect(notification.push_message_title).to eq "#{message.sender.name} (##{notification.primary_actor.display_id}) enviou uma nova mensagem"
     end
 
     it 'returns appropriate title suited for the notification type conversation_mention' do
@@ -64,7 +62,7 @@ has been assigned to you"
       notification = create(:notification, notification_type: 'conversation_mention', primary_actor: message.conversation,
                                            secondary_actor: message)
 
-      expect(notification.push_message_title).to eq "You have been mentioned in conversation (##{notification.primary_actor.display_id})"
+      expect(notification.push_message_title).to eq "#{message.sender.name} mencionou você na conversa (##{notification.primary_actor.display_id})"
     end
   end
 
@@ -107,7 +105,7 @@ has been assigned to you"
       message.save!
       notification = create(:notification, notification_type: 'assigned_conversation_new_message', primary_actor: conversation,
                                            secondary_actor: message)
-      expect(notification.push_message_body).to eq "#{message.sender.name}: Attachment"
+      expect(notification.push_message_body).to eq "#{message.sender.name}: Anexo"
     end
 
     it 'returns appropriate body suited for the notification type participating_conversation_new_message having multple mention' do

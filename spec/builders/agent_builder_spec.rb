@@ -35,6 +35,10 @@ RSpec.describe AgentBuilder, type: :model do
       it 'returns a user' do
         expect(agent_builder.perform).to be_a(User)
       end
+
+      it 'sets the user locale to pt_BR' do
+        expect(agent_builder.perform.ui_settings['locale']).to eq('pt_BR')
+      end
     end
 
     context 'when user exists' do
@@ -48,6 +52,11 @@ RSpec.describe AgentBuilder, type: :model do
 
       it 'creates a new account user' do
         expect { agent_builder.perform }.to change(AccountUser, :count).by(1)
+      end
+
+      it 'sets the existing user locale to pt_BR' do
+        user = agent_builder.perform
+        expect(user.reload.ui_settings['locale']).to eq('pt_BR')
       end
     end
 

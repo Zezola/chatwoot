@@ -29,6 +29,8 @@
 
 class Notification < ApplicationRecord
   include MessageFormatHelper
+
+  VIRTI_DEFAULT_LOCALE = 'pt_BR'.freeze
   belongs_to :account
   belongs_to :user
 
@@ -85,43 +87,22 @@ class Notification < ApplicationRecord
     }
   end
 
-  # rubocop:disable Metrics/MethodLength
   def push_message_title
-    notification_title_map = {
-      'conversation_creation' => 'notifications.notification_title.conversation_creation',
-      'conversation_assignment' => 'notifications.notification_title.conversation_assignment',
-      'assigned_conversation_new_message' => 'notifications.notification_title.assigned_conversation_new_message',
-      'participating_conversation_new_message' => 'notifications.notification_title.assigned_conversation_new_message',
-      'conversation_mention' => 'notifications.notification_title.conversation_mention',
-      'sla_missed_first_response' => 'notifications.notification_title.sla_missed_first_response',
-      'sla_missed_next_response' => 'notifications.notification_title.sla_missed_next_response',
-      'sla_missed_resolution' => 'notifications.notification_title.sla_missed_resolution'
-    }
-
-    i18n_key = notification_title_map[notification_type]
-    return '' unless i18n_key
-
-    if notification_type == 'conversation_creation'
-      I18n.t(i18n_key, display_id: conversation.display_id, inbox_name: primary_actor.inbox.name)
-    elsif %w[conversation_assignment assigned_conversation_new_message participating_conversation_new_message
-             conversation_mention].include?(notification_type)
-      I18n.t(i18n_key, display_id: conversation.display_id)
-    else
-      I18n.t(i18n_key, display_id: primary_actor.display_id)
-    end
+    I18n.with_locale(VIRTI_DEFAULT_LOCALE) { push_message_title_in_portuguese }
   end
-  # rubocop:enable Metrics/MethodLength
 
   def push_message_body
-    case notification_type
-    when 'conversation_creation', 'sla_missed_first_response'
-      message_body(conversation.messages.first)
-    when 'assigned_conversation_new_message', 'participating_conversation_new_message', 'conversation_mention'
-      message_body(secondary_actor)
-    when 'conversation_assignment', 'sla_missed_next_response', 'sla_missed_resolution'
-      message_body((conversation.messages.incoming.last || conversation.messages.outgoing.last))
-    else
-      ''
+    I18n.with_locale(VIRTI_DEFAULT_LOCALE) do
+      case notification_type
+      when 'conversation_creation', 'sla_missed_first_response'
+        message_body(conversation.messages.first)
+      when 'assigned_conversation_new_message', 'participating_conversation_new_message', 'conversation_mention'
+        message_body(secondary_actor)
+      when 'conversation_assignment', 'sla_missed_next_response', 'sla_missed_resolution'
+        message_body((conversation.messages.incoming.last || conversation.messages.outgoing.last))
+      else
+        ''
+      end
     end
   end
 
@@ -130,6 +111,36 @@ class Notification < ApplicationRecord
   end
 
   private
+
+  def push_message_title_in_portuguese
+    case notification_type
+    when 'conversation_creation', 'conversation_assignment'
+      "Nova conversa de #{conversation_contact_name} (##{conversation.display_id})"
+    when 'assigned_conversation_new_message', 'participating_conversation_new_message'
+      "#{notification_actor_name(secondary_actor)} (##{conversation.display_id}) enviou uma nova mensagem"
+    when 'conversation_mention'
+      "#{notification_actor_name(secondary_actor)} mencionou você na conversa (##{conversation.display_id})"
+    when 'sla_missed_first_response'
+      I18n.t('notifications.notification_title.sla_missed_first_response', display_id: primary_actor.display_id)
+    when 'sla_missed_next_response'
+      I18n.t('notifications.notification_title.sla_missed_next_response', display_id: primary_actor.display_id)
+    when 'sla_missed_resolution'
+      I18n.t('notifications.notification_title.sla_missed_resolution', display_id: primary_actor.display_id)
+    else
+      ''
+    end
+  end
+
+  def conversation_contact_name
+    conversation.contact&.name.presence || 'Contato'
+  end
+
+  def notification_actor_name(actor)
+    sender = actor.try(:sender)
+    return conversation_contact_name if sender.is_a?(Contact)
+
+    sender.try(:available_name).presence || sender.try(:name).presence || conversation_contact_name
+  end
 
   def message_body(actor)
     sender_name = sender_name(actor)

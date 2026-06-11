@@ -74,7 +74,29 @@ const store = useStore();
 const resolveAttributesModalRef = ref(null);
 
 const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
-const activeStatus = ref(wootConstants.STATUS_TYPE.ALL);
+const statusByAssigneeType = ref({
+  [wootConstants.ASSIGNEE_TYPE.ME]: wootConstants.STATUS_TYPE.ALL,
+  [wootConstants.ASSIGNEE_TYPE.ALL]: wootConstants.STATUS_TYPE.ALL,
+  [wootConstants.ASSIGNEE_TYPE.UNASSIGNED]:
+    wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED,
+});
+const activeStatus = computed({
+  get() {
+    return (
+      statusByAssigneeType.value[activeAssigneeTab.value] ||
+      defaultStatusForAssigneeTab(activeAssigneeTab.value)
+    );
+  },
+  set(value) {
+    statusByAssigneeType.value = {
+      ...statusByAssigneeType.value,
+      [activeAssigneeTab.value]: normalizedStatusForAssigneeTab(
+        value,
+        activeAssigneeTab.value
+      ),
+    };
+  },
+});
 const activeSortBy = ref(wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC);
 const showAdvancedFilters = ref(false);
 // chatsOnView is to store the chats that are currently visible on the screen,
@@ -256,10 +278,13 @@ const conversationListPagination = computed(() => {
 });
 
 const conversationFilters = computed(() => {
+  const status = statusForRequest(activeStatus.value);
+
   return {
     inboxId: props.conversationInbox ? props.conversationInbox : undefined,
     assigneeType: activeAssigneeTab.value,
-    status: activeStatus.value,
+    status,
+    statusByAssigneeType: statusByAssigneeTypeForRequest.value,
     sortBy: activeSortBy.value,
     page: conversationListPagination.value,
     labels: props.label ? [props.label] : undefined,
@@ -370,11 +395,58 @@ const uniqueInboxes = computed(() => {
   return [...new Set(selectedInboxes.value)];
 });
 
+const statusByAssigneeTypeForRequest = computed(() => {
+  return Object.fromEntries(
+    Object.entries(statusByAssigneeType.value).map(([assigneeType, status]) => [
+      assigneeType,
+      statusForRequest(status),
+    ])
+  );
+});
+
 // ---------------------- Methods -----------------------
+function defaultStatusForAssigneeTab(assigneeTab) {
+  return assigneeTab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED
+    ? wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED
+    : wootConstants.STATUS_TYPE.ALL;
+}
+
+function statusForRequest(status) {
+  return status === wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED
+    ? wootConstants.ACTIVE_CONVERSATION_STATUS_TYPES
+    : status;
+}
+
+function normalizedStatusForAssigneeTab(status, assigneeTab) {
+  if (assigneeTab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    return status || wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED;
+  }
+
+  return status === wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED || !status
+    ? wootConstants.STATUS_TYPE.ALL
+    : status;
+}
+
+function normalizedStatusByAssigneeType(savedStatuses = {}) {
+  const statuses = savedStatuses || {};
+
+  return Object.fromEntries(
+    Object.values(wootConstants.ASSIGNEE_TYPE).map(assigneeType => [
+      assigneeType,
+      normalizedStatusForAssigneeTab(
+        statuses[assigneeType] || defaultStatusForAssigneeTab(assigneeType),
+        assigneeType
+      ),
+    ])
+  );
+}
+
 function setFiltersFromUISettings() {
   const { conversations_filter_by: filterBy = {} } = uiSettings.value;
-  const { status, order_by: orderBy } = filterBy;
-  activeStatus.value = status || wootConstants.STATUS_TYPE.ALL;
+  const { status_by_assignee_type: savedStatusByAssigneeType, order_by: orderBy } = filterBy;
+  statusByAssigneeType.value = normalizedStatusByAssigneeType(
+    savedStatusByAssigneeType
+  );
   activeSortBy.value = Object.values(wootConstants.SORT_BY_TYPE).includes(
     orderBy
   )
@@ -600,9 +672,8 @@ function updateAssigneeTab(selectedTab) {
     resetBulkActions();
     emitter.emit('clearSearchInput');
     activeAssigneeTab.value = selectedTab;
-    if (!currentPage.value) {
-      fetchConversations();
-    }
+    store.dispatch('setChatStatusFilter', activeStatus.value);
+    resetAndFetchData();
   }
 }
 
@@ -798,8 +869,8 @@ useEmitter('fetch_conversation_stats', () => {
 });
 
 onMounted(() => {
-  store.dispatch('setChatListFilters', conversationFilters.value);
   setFiltersFromUISettings();
+  store.dispatch('setChatListFilters', conversationFilters.value);
   store.dispatch('setChatStatusFilter', activeStatus.value);
   store.dispatch('setChatSortFilter', activeSortBy.value);
   resetAndFetchData();
@@ -887,6 +958,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       :page-title="pageTitle"
       :has-applied-filters="hasAppliedFilters"
       :has-active-folders="hasActiveFolders"
+      :active-assignee-tab="activeAssigneeTab"
       :active-status="activeStatus"
       :is-on-expanded-layout="isOnExpandedLayout"
       :conversation-stats="conversationStats"

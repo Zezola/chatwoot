@@ -54,10 +54,12 @@ const isSnoozed = computed(
   () => currentChat.value.status === wootConstants.STATUS_TYPE.SNOOZED
 );
 
-const showAdditionalActions = computed(() => isOpen.value || isResolved.value);
+const showAdditionalActions = computed(
+  () => isOpen.value || isPending.value || isResolved.value || isSnoozed.value
+);
 
 const showOpenButton = computed(() => {
-  return isPending.value || isSnoozed.value;
+  return isPending.value || isResolved.value || isSnoozed.value;
 });
 
 const getConversationParams = () => {
@@ -78,11 +80,6 @@ const getConversationParams = () => {
     activeIndex: activeConversationIndex,
     lastIndex: lastConversationIndex,
   };
-};
-
-const openSnoozeModal = () => {
-  const ninja = document.querySelector('ninja-keys');
-  ninja?.open({ parent: 'snooze_conversation' });
 };
 
 const toggleStatus = (
@@ -233,21 +230,12 @@ useEmitter(CMD_RESOLVE_CONVERSATION, onCmdResolveConversation);
         @click="toggleStatus(wootConstants.STATUS_TYPE.PENDING)"
       />
       <Button
-        v-else-if="isResolved"
-        :label="t('CONVERSATION.HEADER.REOPEN_ACTION')"
-        size="sm"
-        color="slate"
-        no-animation
-        class="ltr:rounded-r-none rtl:rounded-l-none !outline-0"
-        :is-loading="isLoading"
-        @click="onCmdOpenConversation"
-      />
-      <Button
         v-else-if="showOpenButton"
         :label="t('CONVERSATION.HEADER.OPEN_ACTION')"
         size="sm"
         color="slate"
         no-animation
+        class="ltr:rounded-r-none rtl:rounded-l-none !outline-0"
         :is-loading="isLoading"
         @click="onCmdOpenConversation"
       />
@@ -270,8 +258,7 @@ useEmitter(CMD_RESOLVE_CONVERSATION, onCmdResolveConversation);
       class="border rounded-lg shadow-lg border-n-strong dark:border-n-strong box-content p-2 w-fit z-10 bg-n-alpha-3 backdrop-blur-[100px] absolute block left-auto top-full mt-0.5 start-0 xl:start-auto xl:end-0 max-w-[12.5rem] min-w-[9.75rem] [&_ul>li]:mb-0"
     >
       <WootDropdownMenu class="mb-0">
-        <!-- Opções quando status = OPEN -->
-        <template v-if="isOpen">
+        <template v-if="!isResolved">
           <WootDropdownItem>
             <Button
               :label="t('CONVERSATION.HEADER.RESOLVE_ACTION')"
@@ -284,21 +271,8 @@ useEmitter(CMD_RESOLVE_CONVERSATION, onCmdResolveConversation);
               @click="onCmdResolveConversation"
             />
           </WootDropdownItem>
-          <WootDropdownItem>
-            <Button
-              :label="t('CONVERSATION.RESOLVE_DROPDOWN.SNOOZE_UNTIL')"
-              ghost
-              slate
-              sm
-              start
-              icon="i-lucide-alarm-clock-minus"
-              class="w-full"
-              @click="openSnoozeModal()"
-            />
-          </WootDropdownItem>
         </template>
 
-        <!-- Opções quando status = RESOLVED -->
         <template v-if="isResolved">
           <WootDropdownItem>
             <Button
@@ -310,18 +284,6 @@ useEmitter(CMD_RESOLVE_CONVERSATION, onCmdResolveConversation);
               icon="i-lucide-circle-dot-dashed"
               class="w-full"
               @click="toggleStatus(wootConstants.STATUS_TYPE.PENDING)"
-            />
-          </WootDropdownItem>
-          <WootDropdownItem>
-            <Button
-              :label="t('CONVERSATION.RESOLVE_DROPDOWN.SNOOZE_UNTIL')"
-              ghost
-              slate
-              sm
-              start
-              icon="i-lucide-alarm-clock-minus"
-              class="w-full"
-              @click="openSnoozeModal()"
             />
           </WootDropdownItem>
         </template>

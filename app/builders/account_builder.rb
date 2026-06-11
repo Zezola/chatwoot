@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class AccountBuilder
+  VIRTI_DEFAULT_LOCALE = 'pt_BR'.freeze
+
   include CustomExceptions::Account
   pattr_initialize [:account_name, :email!, :confirmed, :user, :user_full_name, :user_password, :super_admin, :locale]
 
@@ -46,7 +48,7 @@ class AccountBuilder
   def create_account
     @account = Account.create!(
       name: account_name,
-      locale: I18n.locale,
+      locale: account_locale,
       custom_attributes: { 'onboarding_step' => 'account_details' }
     )
     Current.account = @account
@@ -54,6 +56,7 @@ class AccountBuilder
 
   def create_and_link_user
     if @user.present? || create_user
+      ensure_user_locale(@user)
       link_user_to_account(@user, @account)
       @user
     else
@@ -73,9 +76,22 @@ class AccountBuilder
     @user = User.new(email: @email,
                      password: user_password,
                      password_confirmation: user_password,
-                     name: user_full_name)
+                     name: user_full_name,
+                     ui_settings: locale_settings)
     @user.type = 'SuperAdmin' if @super_admin
     @user.confirm if @confirmed
     @user.save!
+  end
+
+  def ensure_user_locale(user)
+    user.update!(ui_settings: locale_settings(user)) if user.ui_settings&.dig('locale') != account_locale
+  end
+
+  def locale_settings(user = nil)
+    (user&.ui_settings || {}).merge('locale' => account_locale)
+  end
+
+  def account_locale
+    VIRTI_DEFAULT_LOCALE
   end
 end

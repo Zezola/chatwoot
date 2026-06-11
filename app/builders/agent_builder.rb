@@ -2,6 +2,8 @@
 # It initializes with necessary attributes and provides a perform method
 # to create a user and account user in a transaction.
 class AgentBuilder
+  VIRTI_DEFAULT_LOCALE = 'pt_BR'.freeze
+
   # Initializes an AgentBuilder with necessary attributes.
   # @param email [String] the email of the user.
   # @param name [String] the name of the user.
@@ -27,11 +29,24 @@ class AgentBuilder
   # @return [User] the found or created user.
   def find_or_create_user
     user = User.from_email(email)
-    return user if user
+    return ensure_user_locale(user) if user
 
     @name = email.split('@').first if @name.blank?
     temp_password = "1!aA#{SecureRandom.alphanumeric(12)}"
-    User.create!(email: email, name: @name, password: temp_password, password_confirmation: temp_password)
+    User.create!(email: email, name: @name, password: temp_password, password_confirmation: temp_password, ui_settings: locale_settings)
+  end
+
+  def ensure_user_locale(user)
+    user.update!(ui_settings: locale_settings(user)) if user.ui_settings&.dig('locale') != user_locale
+    user
+  end
+
+  def locale_settings(user = nil)
+    (user&.ui_settings || {}).merge('locale' => user_locale)
+  end
+
+  def user_locale
+    VIRTI_DEFAULT_LOCALE
   end
 
   # Checks if the user needs confirmation.

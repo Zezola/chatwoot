@@ -2,6 +2,8 @@ class ConversationFinder
   attr_reader :current_user, :current_account, :params
 
   DEFAULT_STATUS = 'open'.freeze
+  ACTIVE_STATUS_FILTER = 'open_pending_snoozed'.freeze
+  ACTIVE_STATUSES = %w[open pending snoozed].freeze
   SORT_OPTIONS = {
     'last_activity_at_asc' => %w[sort_on_last_activity_at asc],
     'last_activity_at_desc' => %w[sort_on_last_activity_at desc],
@@ -80,11 +82,12 @@ class ConversationFinder
     set_assignee_type
 
     find_all_conversations
-    filter_by_status unless params[:q]
     filter_by_team
     filter_by_labels
     filter_by_query
     filter_by_source_id
+    @conversations_before_status = @conversations
+    filter_by_status unless params[:q]
   end
 
   def set_inboxes
@@ -159,9 +162,10 @@ class ConversationFinder
   end
 
   def filter_by_status
-    return if params[:status] == 'all'
+    statuses = normalized_status_values(params[:status] || DEFAULT_STATUS)
+    return if statuses.blank?
 
-    @conversations = @conversations.where(status: params[:status] || DEFAULT_STATUS)
+    @conversations = @conversations.where(status: statuses)
   end
 
   def filter_by_team
@@ -184,11 +188,58 @@ class ConversationFinder
   end
 
   def set_count_for_all_conversations
+    return count_by_assignee_status if params[:status_by_assignee_type].present?
+
     [
       @conversations.assigned_to(current_user).count,
       @conversations.unassigned.count,
       @conversations.count
     ]
+  end
+
+  def count_by_assignee_status
+    base_conversations = @conversations_before_status || @conversations
+    status_by_assignee_type = status_by_assignee_type_params
+
+    [
+      apply_status_filter(base_conversations.assigned_to(current_user), status_by_assignee_type['me']).count,
+      apply_status_filter(base_conversations.unassigned, status_by_assignee_type['unassigned']).count,
+      apply_status_filter(base_conversations, status_by_assignee_type['all']).count
+    ]
+  end
+
+  def apply_status_filter(scope, status)
+    statuses = normalized_status_values(status)
+    return scope if statuses.blank?
+
+    scope.where(status: statuses)
+  end
+
+  def normalized_status_values(status)
+    raw_status = if status.respond_to?(:to_unsafe_h)
+                   status.to_unsafe_h
+                 elsif status.is_a?(Hash)
+                   status.to_h
+                 else
+                   status
+                 end
+    raw_status = raw_status.values if raw_status.is_a?(Hash)
+
+    statuses = Array.wrap(raw_status).flat_map { |value| value == ACTIVE_STATUS_FILTER ? ACTIVE_STATUSES : value }
+    return if statuses.include?('all')
+
+    statuses.compact_blank
+  end
+
+  def status_by_assignee_type_params
+    raw_statuses = params[:status_by_assignee_type]
+    statuses = raw_statuses.respond_to?(:to_unsafe_h) ? raw_statuses.to_unsafe_h : raw_statuses.to_h
+
+    {
+      'me' => statuses['me'] || 'all',
+      'unassigned' => statuses['unassigned'] || ACTIVE_STATUSES,
+      'all' => statuses['all'] || 'all'
+    }
   end
 
   def current_page

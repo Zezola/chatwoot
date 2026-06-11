@@ -9,6 +9,7 @@ class ConversationApi extends ApiClient {
   get({
     inboxId,
     status,
+    statusByAssigneeType,
     assigneeType,
     page,
     labels,
@@ -22,6 +23,7 @@ class ConversationApi extends ApiClient {
         inbox_id: inboxId,
         team_id: teamId,
         status,
+        status_by_assignee_type: statusByAssigneeType,
         assignee_type: assigneeType,
         page,
         labels,
@@ -96,11 +98,20 @@ class ConversationApi extends ApiClient {
     return axios.post(`${this.url}/${conversationId}/unmute`);
   }
 
-  meta({ inboxId, status, assigneeType, labels, teamId, conversationType }) {
+  meta({
+    inboxId,
+    status,
+    statusByAssigneeType,
+    assigneeType,
+    labels,
+    teamId,
+    conversationType,
+  }) {
     return axios.get(`${this.url}/meta`, {
       params: {
         inbox_id: inboxId,
         status,
+        status_by_assignee_type: statusByAssigneeType,
         assignee_type: assigneeType,
         labels,
         team_id: teamId,

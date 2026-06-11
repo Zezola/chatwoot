@@ -7,8 +7,17 @@ export const findPendingMessageIndex = (chat, message) => {
   );
 };
 
-export const filterByStatus = (chatStatus, filterStatus) =>
-  filterStatus === 'all' ? true : chatStatus === filterStatus;
+export const filterByStatus = (chatStatus, filterStatus) => {
+  if (Array.isArray(filterStatus)) {
+    return filterStatus.includes(chatStatus);
+  }
+
+  if (filterStatus === 'open_pending_snoozed') {
+    return ['open', 'pending', 'snoozed'].includes(chatStatus);
+  }
+
+  return filterStatus === 'all' ? true : chatStatus === filterStatus;
+};
 
 export const filterByInbox = (shouldFilter, inboxId, chatInboxId) => {
   const isOnInbox = Number(inboxId) === chatInboxId;

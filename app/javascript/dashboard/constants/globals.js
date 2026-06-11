@@ -10,8 +10,10 @@ export default {
     RESOLVED: 'resolved',
     PENDING: 'pending',
     SNOOZED: 'snoozed',
+    OPEN_PENDING_SNOOZED: 'open_pending_snoozed',
     ALL: 'all',
   },
+  ACTIVE_CONVERSATION_STATUS_TYPES: ['open', 'pending', 'snoozed'],
   CONVERSATION_TYPE: {
     MENTION: 'mention',
     PARTICIPATING: 'participating',
