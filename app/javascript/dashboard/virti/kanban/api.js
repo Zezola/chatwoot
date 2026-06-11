@@ -47,8 +47,13 @@ class AccountScopedKanbanAPI extends ApiClient {
     return axios.delete(`${this.url}/users/${userId}/model`);
   }
 
-  getCards(modelId, limit = 50) {
-    return axios.get(`${this.url}/models/${modelId}/cards`, { params: { limit } });
+  getCards(modelId, options = {}) {
+    const params = typeof options === 'number' ? { limit: options } : options;
+    return axios.get(`${this.url}/models/${modelId}/cards`, { params });
+  }
+
+  getColumnCards(modelId, columnId, params = {}) {
+    return axios.get(`${this.url}/models/${modelId}/columns/${columnId}/cards`, { params });
   }
 
   moveCard(modelId, payload) {
@@ -101,8 +106,12 @@ export default class VirtiKanbanAPI {
     return this.accountScoped.deleteUserModel(userId);
   }
 
-  getCards(modelId, limit) {
-    return this.accountScoped.getCards(modelId, limit);
+  getCards(modelId, options) {
+    return this.accountScoped.getCards(modelId, options);
+  }
+
+  getColumnCards(modelId, columnId, params) {
+    return this.accountScoped.getColumnCards(modelId, columnId, params);
   }
 
   moveCard(modelId, payload) {

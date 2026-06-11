@@ -9,6 +9,10 @@ class Api::V1::Accounts::Virti::Kanban::CardsController < Api::V1::Accounts::Vir
     }
   end
 
+  def column
+    render json: column_with_cards(serialized_column_by_id(params.require(:column_id)))
+  end
+
   def move
     conversation = Current.account.conversations.find_by!(display_id: params.require(:conversation_id))
     return render json: { error: 'Permission denied' }, status: :forbidden unless allowed_conversation?(conversation)
@@ -48,18 +52,36 @@ class Api::V1::Accounts::Virti::Kanban::CardsController < Api::V1::Accounts::Vir
 
   def serialized_columns_with_cards
     serialized_configuration[:columns].map do |column|
-      column.merge(cards: cards_for_column(column))
+      column_with_cards(column)
     end
   end
 
-  def cards_for_column(column)
-    label_titles = column[:labels].map { |label| label[:title] }.compact
-    return [] if label_titles.empty?
+  def column_with_cards(column)
+    column.merge(cards_payload_for_column(column))
+  end
 
-    scope = Virti::Acl::ConversationScope.new(scope: Current.account.conversations, user: current_user, account: Current.account).perform
-    scope.includes(:contact).tagged_with(label_titles, any: true).sort_on_last_activity_at.limit(cards_limit).map do |conversation|
-      serialize_conversation(conversation)
-    end
+  def cards_payload_for_column(column)
+    relation = cards_relation_for_column(column)
+    total_cards = total_cards_count(relation)
+    conversations = relation_with_cursor(relation).limit(cards_per_page + 1).to_a
+    has_more = conversations.length > cards_per_page
+    cards = conversations.first(cards_per_page)
+
+    {
+      cards: cards.map { |conversation| serialize_conversation(conversation) },
+      hasMore: has_more,
+      nextCursor: has_more ? encode_cursor(cards.last) : nil,
+      totalCards: total_cards
+    }
+  end
+
+  def cards_relation_for_column(column)
+    label_titles = column[:labels].map { |label| label[:title] }.compact
+    return Current.account.conversations.none if label_titles.empty?
+
+    acl_conversation_scope.includes(:contact)
+                          .tagged_with(label_titles, any: true)
+                          .reorder(last_activity_at: :desc, id: :desc)
   end
 
   def serialize_conversation(conversation)
@@ -75,6 +97,13 @@ class Api::V1::Accounts::Virti::Kanban::CardsController < Api::V1::Accounts::Vir
 
   def column_by_id(column_id)
     column = @model.normalized_configuration['columns'].find { |candidate| candidate['id'] == column_id }
+    return column if column.present?
+
+    raise ActiveRecord::RecordNotFound, 'Column not found'
+  end
+
+  def serialized_column_by_id(column_id)
+    column = serialized_configuration[:columns].find { |candidate| candidate[:id] == column_id }
     return column if column.present?
 
     raise ActiveRecord::RecordNotFound, 'Column not found'
@@ -100,9 +129,49 @@ class Api::V1::Accounts::Virti::Kanban::CardsController < Api::V1::Accounts::Vir
     @serialized_configuration ||= serialize_configuration(@model.configuration)
   end
 
-  def cards_limit
-    limit = params[:limit].presence || 50
-    [[limit.to_i, 1].max, 100].min
+  def cards_per_page
+    per_page = params[:per_page].presence || params[:limit].presence || 30
+    [[per_page.to_i, 1].max, 100].min
+  end
+
+  def relation_with_cursor(relation)
+    cursor = decoded_cursor
+    return relation if cursor.blank?
+
+    relation.where(
+      'conversations.last_activity_at < :last_activity_at OR (conversations.last_activity_at = :last_activity_at AND conversations.id < :id)',
+      last_activity_at: cursor[:last_activity_at],
+      id: cursor[:id]
+    )
+  end
+
+  def decoded_cursor
+    return if params[:cursor].blank?
+
+    timestamp, id = params[:cursor].to_s.split(':', 2)
+    return if timestamp.blank? || id.blank?
+
+    { last_activity_at: Time.zone.at(Float(timestamp)), id: Integer(id) }
+  rescue ArgumentError, TypeError
+    nil
+  end
+
+  def encode_cursor(conversation)
+    return if conversation.blank?
+
+    "#{conversation.last_activity_at.to_f}:#{conversation.id}"
+  end
+
+  def total_cards_count(relation)
+    relation.except(:order, :limit, :offset).distinct.count(:id)
+  end
+
+  def acl_conversation_scope
+    @acl_conversation_scope ||= Virti::Acl::ConversationScope.new(
+      scope: Current.account.conversations,
+      user: current_user,
+      account: Current.account
+    ).perform
   end
 
   def allowed_conversation?(conversation)

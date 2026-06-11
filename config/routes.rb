@@ -292,6 +292,7 @@ Rails.application.routes.draw do
               get '/', to: 'boards#show'
               resources :models, only: [:index, :show, :create, :update, :destroy], controller: 'models'
               get 'models/:model_id/cards', to: 'cards#index'
+              get 'models/:model_id/columns/:column_id/cards', to: 'cards#column'
               post 'models/:model_id/cards/move', to: 'cards#move'
               get 'user_models', to: 'user_models#index'
               scope 'users/:user_id' do

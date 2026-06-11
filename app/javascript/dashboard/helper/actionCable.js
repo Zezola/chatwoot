@@ -107,6 +107,10 @@ class ActionCableConnector extends BaseActionCableConnector {
       lastActivityAt,
       conversationId,
     });
+    emitter.emit(BUS_EVENTS.KANBAN_CONVERSATION_ACTIVITY, {
+      event: 'message.created',
+      data,
+    });
   };
 
   // eslint-disable-next-line class-methods-use-this
@@ -120,6 +124,10 @@ class ActionCableConnector extends BaseActionCableConnector {
   onConversationUpdated = data => {
     this.app.$store.dispatch('updateConversation', data);
     this.fetchConversationStats();
+    emitter.emit(BUS_EVENTS.KANBAN_CONVERSATION_ACTIVITY, {
+      event: 'conversation.updated',
+      data,
+    });
   };
 
   onConversationRemovedFromScope = data => {
