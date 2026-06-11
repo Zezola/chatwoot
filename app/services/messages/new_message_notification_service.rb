@@ -3,7 +3,7 @@ class Messages::NewMessageNotificationService
 
   def perform
     return unless message.notifiable?
-    return if message.bot_response?
+    return if bot_response?
 
     notify_conversation_assignee
     notify_participating_users
@@ -12,6 +12,10 @@ class Messages::NewMessageNotificationService
   private
 
   delegate :conversation, :sender, :account, to: :message
+
+  def bot_response?
+    message.outgoing? && message.sender_type.in?(%w[AgentBot Captain::Assistant])
+  end
 
   def notify_conversation_assignee
     return if conversation.assignee.blank?
