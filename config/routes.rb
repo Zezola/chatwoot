@@ -10,6 +10,11 @@ Rails.application.routes.draw do
 
   post 'resend_confirmation', to: 'auth/resend_confirmations#create'
 
+  namespace :virti do
+    get 'notification_delivery_events/:delivery_token/received', to: 'notification_delivery_events#received'
+    get 'notification_delivery_events/:delivery_token/clicked', to: 'notification_delivery_events#clicked'
+  end
+
   ## renders the frontend paths only if its not an api only server
   if ActiveModel::Type::Boolean.new.cast(ENV.fetch('CW_API_ONLY_SERVER', false))
     root to: 'api#index'
@@ -300,6 +305,8 @@ Rails.application.routes.draw do
               end
               get 'users/:user_id', to: 'boards#show_user'
             end
+
+            resources :notification_delivery_events, only: [:index]
           end
 
           resources :notifications, only: [:index, :update, :destroy] do

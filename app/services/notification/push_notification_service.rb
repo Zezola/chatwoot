@@ -31,11 +31,19 @@ class Notification::PushNotificationService
   end
 
   def push_message
+    delivery_token = SecureRandom.urlsafe_base64(24)
     {
       title: notification.push_message_title,
       tag: "#{notification.notification_type}_#{conversation.display_id}_#{notification.id}",
-      url: push_url
+      url: push_url,
+      receivedUrl: virti_notification_delivery_event_path(delivery_token, 'received'),
+      clickUrl: virti_notification_delivery_event_path(delivery_token, 'clicked'),
+      deliveryToken: delivery_token
     }
+  end
+
+  def virti_notification_delivery_event_path(delivery_token, action)
+    "/virti/notification_delivery_events/#{delivery_token}/#{action}"
   end
 
   def push_url
@@ -46,7 +54,7 @@ class Notification::PushNotificationService
     VapidService.public_key && subscription.browser_push?
   end
 
-  def browser_push_payload(subscription)
+  def browser_push_payload(subscription, push_message)
     {
       message: JSON.generate(push_message),
       endpoint: subscription.subscription_attributes['endpoint'],
@@ -66,9 +74,13 @@ class Notification::PushNotificationService
   def send_browser_push(subscription)
     return unless can_send_browser_push?(subscription)
 
-    WebPush.payload_send(**browser_push_payload(subscription))
-    Rails.logger.info("Browser push sent to #{user.email} with title #{push_message[:title]}")
+    message = push_message
+    record_push_event(subscription, 'send_attempted', 'browser_push', 'webpush', 'attempted', message)
+    WebPush.payload_send(**browser_push_payload(subscription, message))
+    record_push_event(subscription, 'send_accepted', 'browser_push', 'webpush', 'success', message)
+    Rails.logger.info("Browser push sent to #{user.email} with title #{message[:title]}")
   rescue StandardError => e
+    record_push_event(subscription, 'send_failed', 'browser_push', 'webpush', 'failure', message, error_message: e.message) if message.present?
     handle_browser_push_error(e, subscription)
   end
 
@@ -95,8 +107,13 @@ class Notification::PushNotificationService
       GlobalConfigService.load('FIREBASE_PROJECT_ID', nil), GlobalConfigService.load('FIREBASE_CREDENTIALS', nil)
     )
     fcm = fcm_service.fcm_client
+    message = push_message
+    record_push_event(subscription, 'send_attempted', 'fcm', 'firebase', 'attempted', message)
     response = fcm.send_v1(fcm_options(subscription))
-    remove_subscription_if_error(subscription, response)
+    remove_subscription_if_error(subscription, response, message)
+  rescue StandardError => e
+    record_push_event(subscription, 'send_failed', 'fcm', 'firebase', 'failure', message, error_message: e.message) if message.present?
+    raise
   end
 
   def send_push_via_chatwoot_hub(subscription)
@@ -104,7 +121,13 @@ class Notification::PushNotificationService
     return unless chatwoot_hub_enabled?
     return unless subscription.fcm?
 
+    message = push_message
+    record_push_event(subscription, 'send_attempted', 'fcm', 'chatwoot_hub', 'attempted', message)
     ChatwootHub.send_push(fcm_options(subscription))
+    record_push_event(subscription, 'send_accepted', 'fcm', 'chatwoot_hub', 'success', message)
+  rescue StandardError => e
+    record_push_event(subscription, 'send_failed', 'fcm', 'chatwoot_hub', 'failure', message, error_message: e.message) if message.present?
+    raise
   end
 
   def firebase_credentials_present?
@@ -115,11 +138,13 @@ class Notification::PushNotificationService
     ActiveModel::Type::Boolean.new.cast(ENV.fetch('ENABLE_PUSH_RELAY_SERVER', true))
   end
 
-  def remove_subscription_if_error(subscription, response)
+  def remove_subscription_if_error(subscription, response, message)
     if JSON.parse(response[:body])['results']&.first&.keys&.include?('error')
+      record_push_event(subscription, 'send_failed', 'fcm', 'firebase', 'failure', message, error_message: response[:body])
       subscription.destroy!
     else
-      Rails.logger.info("FCM push sent to #{user.email} with title #{push_message[:title]}")
+      record_push_event(subscription, 'send_accepted', 'fcm', 'firebase', 'success', message)
+      Rails.logger.info("FCM push sent to #{user.email} with title #{message[:title]}")
     end
   end
 
@@ -134,6 +159,24 @@ class Notification::PushNotificationService
         analytics_label: 'Label'
       }
     }
+  end
+
+  def record_push_event(subscription, event_type, channel, provider, status, message, error_message: nil)
+    Virti::NotificationDeliveryEventLogger.record(
+      notification: notification,
+      subscription: subscription,
+      event_type: event_type,
+      channel: channel,
+      provider: provider,
+      status: status,
+      delivery_token: message[:deliveryToken],
+      error_message: error_message,
+      metadata: {
+        title: message[:title],
+        target_url: push_url,
+        tag: message[:tag]
+      }
+    )
   end
 
   def fcm_data

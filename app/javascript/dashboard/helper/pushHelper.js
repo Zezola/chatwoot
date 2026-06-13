@@ -35,12 +35,22 @@ const generateKeys = str =>
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
 
+const detectDeviceType = () => {
+  const userAgent = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent) || navigator.maxTouchPoints > 1
+    ? 'mobile'
+    : 'desktop';
+};
+
 export const getPushSubscriptionPayload = subscription => ({
   subscription_type: 'browser_push',
   subscription_attributes: {
     endpoint: subscription.endpoint,
     p256dh: generateKeys(subscription.getKey('p256dh')),
     auth: generateKeys(subscription.getKey('auth')),
+    user_agent: navigator.userAgent || '',
+    platform: navigator.userAgentData?.platform || navigator.platform || 'unknown',
+    device_type: detectDeviceType(),
   },
 });
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_10_000100) do
+ActiveRecord::Schema[7.1].define(version: 2026_06_12_000100) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1357,6 +1357,38 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_10_000100) do
     t.index ["model_id"], name: "index_virti_kanban_user_models_on_model_id"
     t.index ["updated_by_id"], name: "index_virti_kanban_user_models_on_updated_by_id"
     t.index ["user_id"], name: "index_virti_kanban_user_models_on_user_id"
+  end
+
+  create_table "virti_notification_delivery_events", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "notification_id"
+    t.bigint "notification_subscription_id"
+    t.bigint "conversation_id"
+    t.integer "conversation_display_id"
+    t.string "delivery_token"
+    t.string "event_type", null: false
+    t.string "channel", null: false
+    t.string "provider", null: false
+    t.string "status", null: false
+    t.string "device_type"
+    t.string "platform"
+    t.text "user_agent"
+    t.text "error_message"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "occurred_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "user_id", "occurred_at"], name: "idx_virti_push_events_account_user_time"
+    t.index ["account_id"], name: "index_virti_notification_delivery_events_on_account_id"
+    t.index ["conversation_display_id"], name: "index_virti_notification_delivery_events_on_conversation_display_id"
+    t.index ["conversation_id"], name: "index_virti_notification_delivery_events_on_conversation_id"
+    t.index ["delivery_token"], name: "index_virti_notification_delivery_events_on_delivery_token"
+    t.index ["event_type"], name: "index_virti_notification_delivery_events_on_event_type"
+    t.index ["notification_id"], name: "index_virti_notification_delivery_events_on_notification_id"
+    t.index ["notification_subscription_id"], name: "idx_virti_push_events_on_subscription_id"
+    t.index ["occurred_at"], name: "index_virti_notification_delivery_events_on_occurred_at"
+    t.index ["user_id"], name: "index_virti_notification_delivery_events_on_user_id"
   end
 
   create_table "webhooks", force: :cascade do |t|
