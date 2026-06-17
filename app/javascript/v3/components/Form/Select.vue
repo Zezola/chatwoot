@@ -41,6 +41,10 @@ export default {
       type: String,
       default: '',
     },
+    disabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['update:modelValue'],
   methods: {
@@ -63,9 +67,11 @@ export default {
       :id="id"
       :selected="modelValue"
       :name="name"
+      :disabled="disabled"
       :class="{
         'text-n-slate-9': !modelValue,
         'text-n-slate-12': modelValue,
+        'cursor-not-allowed opacity-60': disabled,
         'pl-9': icon,
       }"
       class="block w-full px-3 py-2 pr-6 mb-0 border-0 shadow-sm appearance-none rounded-xl select-caret leading-6"

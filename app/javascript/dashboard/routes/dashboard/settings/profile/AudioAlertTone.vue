@@ -15,6 +15,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['change']);
@@ -72,6 +76,7 @@ const playAudio = async () => {
       :value="selectedValue"
       :options="alertTones"
       :label="label"
+      :disabled="disabled"
     >
       <option
         v-for="tone in alertTones"
