@@ -14,6 +14,13 @@ RSpec.describe AccountUser do
 
       expect(account_user.user.notification_settings.first.email_conversation_creation?).to be(false)
       expect(account_user.user.notification_settings.first.email_conversation_assignment?).to be(true)
+      expect(account_user.user.notification_settings.first.selected_push_flags).to match_array(NotificationSetting::MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS)
+    end
+
+    it 'keeps the original Chatwoot default push setting for administrators' do
+      admin_account_user = create(:account_user, role: :administrator)
+
+      expect(admin_account_user.user.notification_settings.first.selected_push_flags).to eq(['push_conversation_assignment'])
     end
   end
 

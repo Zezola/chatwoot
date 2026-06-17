@@ -36,11 +36,24 @@ export const NOTIFICATION_TYPES = [
   },
 ];
 
+export const MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES = [
+  'conversation_assignment',
+  'conversation_mention',
+  'assigned_conversation_new_message',
+  'participating_conversation_new_message',
+];
+
+export const MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS =
+  MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES.map(type => `push_${type}`);
+
 export const EVENT_TYPES = {
   ASSIGNED: 'assigned',
   NOTME: 'notme',
   UNASSIGNED: 'unassigned',
 };
+
+export const FORCED_AGENT_AUDIO_ALERT_TYPE = EVENT_TYPES.ASSIGNED;
+export const FORCED_AGENT_AUDIO_TONE = 'bell';
 
 export const ALERT_EVENTS = [
   {

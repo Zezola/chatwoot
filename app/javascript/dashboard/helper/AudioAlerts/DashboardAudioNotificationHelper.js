@@ -88,7 +88,7 @@ export class DashboardAudioNotificationHelper {
       tone: audioAlertTone,
     };
 
-    if (previousAudioTone !== audioAlertTone) {
+    if (!this.audioConfig.audio || previousAudioTone !== audioAlertTone) {
       this.intializeAudio();
     }
 
@@ -206,6 +206,21 @@ export class DashboardAudioNotificationHelper {
       if (this.notificationConfig.playAlertOnlyWhenHidden) {
         return;
       }
+    }
+
+    this.playAudioAlert();
+    showBadgeOnFavicon();
+    this.playAudioEvery30Seconds();
+  };
+
+  shouldNotifyOnNotification = () => {
+    const { audioAlertType } = this.notificationConfig;
+    return !audioAlertType.includes('none') && this.shouldPlayAlert();
+  };
+
+  onNotificationCreated = () => {
+    if (!this.shouldNotifyOnNotification()) {
+      return;
     }
 
     this.playAudioAlert();

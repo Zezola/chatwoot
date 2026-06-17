@@ -11,9 +11,16 @@ import { useI18n } from 'vue-i18n';
 import camelcaseKeys from 'camelcase-keys';
 import { initializeAudioAlerts } from 'dashboard/helper/scriptHelpers';
 import { useStoreGetters } from 'dashboard/composables/store';
+import {
+  FORCED_AGENT_AUDIO_ALERT_TYPE,
+  FORCED_AGENT_AUDIO_TONE,
+} from './constants';
 
 const getters = useStoreGetters();
 const currentUser = computed(() => getters.getCurrentUser.value);
+const isCurrentUserAgent = computed(
+  () => getters.getCurrentRole.value === 'agent'
+);
 
 const { uiSettings, updateUISettings } = useUISettings();
 
@@ -28,7 +35,9 @@ const i18nKeyPrefix = 'PROFILE_SETTINGS.FORM.AUDIO_NOTIFICATIONS_SECTION';
 const initializeNotificationUISettings = newUISettings => {
   const updatedUISettings = camelcaseKeys(newUISettings);
 
-  audioAlert.value = updatedUISettings.enableAudioAlerts;
+  audioAlert.value = isCurrentUserAgent.value
+    ? FORCED_AGENT_AUDIO_ALERT_TYPE
+    : updatedUISettings.enableAudioAlerts;
   playAudioWhenTabIsInactive.value = !updatedUISettings.alwaysPlayAudioAlert;
   alertIfUnreadConversationExist.value =
     updatedUISettings.alertIfUnreadAssignedConversationExist;
@@ -46,12 +55,14 @@ const initializeNotificationUISettings = newUISettings => {
       value: 'conversations_are_read',
     },
   ];
-  alertTone.value = updatedUISettings.notificationTone || 'ding';
+  alertTone.value = isCurrentUserAgent.value
+    ? FORCED_AGENT_AUDIO_TONE
+    : updatedUISettings.notificationTone || 'ding';
 };
 
 watch(
-  uiSettings,
-  value => {
+  [uiSettings, isCurrentUserAgent],
+  ([value]) => {
     initializeNotificationUISettings(value);
   },
   { immediate: true }
@@ -68,6 +79,8 @@ onMounted(() => {
 });
 
 const handAudioAlertChange = value => {
+  if (isCurrentUserAgent.value) return;
+
   audioAlert.value = value;
   handleAudioConfigChange({
     enable_audio_alerts: value,
@@ -85,6 +98,8 @@ const handleAudioAlertConditions = (id, value) => {
   }
 };
 const handleAudioToneChange = value => {
+  if (isCurrentUserAgent.value) return;
+
   handleAudioConfigChange({ notification_tone: value });
 };
 </script>
@@ -94,12 +109,14 @@ const handleAudioToneChange = value => {
     <AudioAlertTone
       :value="alertTone"
       :label="$t(`${i18nKeyPrefix}.DEFAULT_TONE.TITLE`)"
+      :disabled="isCurrentUserAgent"
       @change="handleAudioToneChange"
     />
 
     <AudioAlertEvent
       :label="$t(`${i18nKeyPrefix}.ALERT_TYPE.TITLE`)"
       :value="audioAlert"
+      :disabled="isCurrentUserAgent"
       @update="handAudioAlertChange"
     />
 

@@ -4,6 +4,18 @@ module Virti
       module ActionCableListenerPatch
         CONVERSATION_REMOVED_FROM_SCOPE = 'conversation.removed_from_scope'.freeze
 
+        def notification_created(event)
+          return unless notification_visible?(event)
+
+          super
+        end
+
+        def notification_updated(event)
+          return unless notification_visible?(event)
+
+          super
+        end
+
         def assignee_changed(event)
           super
           broadcast_removed_from_scope(event)
@@ -35,6 +47,19 @@ module Virti
         def assignee_change(event)
           changed_attributes = event.data[:changed_attributes] || {}
           changed_attributes[:assignee_id] || changed_attributes['assignee_id']
+        end
+
+        def notification_visible?(event)
+          return true unless Virti::Acl.enabled?
+
+          notification = event.data[:notification]
+          return true if notification.blank?
+
+          Virti::Acl::NotificationPolicy.new(
+            user: notification.user,
+            account: notification.account,
+            notification: notification
+          ).show?
         end
       end
     end

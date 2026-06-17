@@ -180,9 +180,41 @@ describe ActionCableListener do
     end
   end
 
+  describe '#notification_created' do
+    let(:event_name) { :'notification.created' }
+    let!(:notification) { create(:notification, account: account, user: agent, primary_actor: conversation) }
+    let!(:event) { Events::Base.new(event_name, Time.zone.now, notification: notification) }
+
+    it 'sends notification to the notification user' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'notification.created',
+        {
+          account_id: notification.account_id,
+          notification: notification.push_event_data,
+          unread_count: 1,
+          count: 1
+        }
+      )
+
+      listener.notification_created(event)
+    end
+
+    it 'does not send notification when Virti ACL denies access to the conversation' do
+      other_agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, inbox: inbox, user: other_agent)
+      conversation.update!(assignee: other_agent)
+      restrict_conversation_acl(agent)
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+
+      listener.notification_created(event)
+    end
+  end
+
   describe '#notification_updated' do
     let(:event_name) { :'notification.updated' }
-    let!(:notification) { create(:notification, account: account, user: agent) }
+    let!(:notification) { create(:notification, account: account, user: agent, primary_actor: conversation) }
     let!(:event) { Events::Base.new(event_name, Time.zone.now, notification: notification) }
 
     it 'sends notification to account admins, inbox agents' do
@@ -196,6 +228,17 @@ describe ActionCableListener do
           count: 1
         }
       )
+
+      listener.notification_updated(event)
+    end
+
+    it 'does not send notification when Virti ACL denies access to the conversation' do
+      other_agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, inbox: inbox, user: other_agent)
+      conversation.update!(assignee: other_agent)
+      restrict_conversation_acl(agent)
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
 
       listener.notification_updated(event)
     end
@@ -230,5 +273,14 @@ describe ActionCableListener do
       )
       listener.conversation_updated(event)
     end
+  end
+
+  def restrict_conversation_acl(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
   end
 end

@@ -29,6 +29,34 @@ describe Notification::PushNotificationService do
         end
       end
 
+      it 'sends mandatory agent push notifications even when the flag is turned off' do
+        with_modified_env VAPID_PUBLIC_KEY: 'test' do
+          notification_setting = user.notification_settings.find_by(account_id: account.id)
+          notification_setting.selected_push_flags = []
+          notification_setting.save!
+          create(:notification_subscription, user: notification.user)
+
+          described_class.new(notification: notification).perform
+
+          expect(WebPush).to have_received(:payload_send)
+        end
+      end
+
+      it 'does not force push notifications for administrators' do
+        with_modified_env VAPID_PUBLIC_KEY: 'test' do
+          admin = create(:user, account: account, role: :administrator)
+          admin_notification = create(:notification, user: admin, account: account, notification_type: 'conversation_assignment')
+          notification_setting = admin.notification_settings.find_by(account_id: account.id)
+          notification_setting.selected_push_flags = []
+          notification_setting.save!
+          create(:notification_subscription, user: admin)
+
+          expect(WebPush).not_to receive(:payload_send)
+
+          described_class.new(notification: admin_notification).perform
+        end
+      end
+
       it 'sends a fcm notification for firebase subscription' do
         with_modified_env ENABLE_PUSH_RELAY_SERVER: 'false' do
           create(:notification_subscription, user: notification.user, subscription_type: 'fcm')
@@ -38,6 +66,20 @@ describe Notification::PushNotificationService do
           expect(fcm_double).to have_received(:send_v1)
           expect(WebPush).not_to have_received(:payload_send)
           expect(Rails.logger).to have_received(:info).with("FCM push sent to #{user.email} with title #{notification.push_message_title}")
+        end
+      end
+
+      it 'does not send push when Virti ACL denies access to the conversation' do
+        with_modified_env VAPID_PUBLIC_KEY: 'test' do
+          other_user = create(:user, account: account)
+          create(:inbox_member, inbox: notification.conversation.inbox, user: other_user)
+          notification.conversation.update!(assignee: other_user)
+          restrict_conversation_acl(user)
+          create(:notification_subscription, user: notification.user)
+
+          expect(WebPush).not_to receive(:payload_send)
+
+          described_class.new(notification: notification).perform
         end
       end
     end
@@ -61,5 +103,14 @@ describe Notification::PushNotificationService do
         described_class.new(notification: notification).perform
       end
     end
+  end
+
+  def restrict_conversation_acl(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
   end
 end

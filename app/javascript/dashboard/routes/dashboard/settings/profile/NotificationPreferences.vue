@@ -10,7 +10,11 @@ import {
 } from 'dashboard/helper/pushHelper.js';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import ToggleSwitch from 'dashboard/components-next/switch/Switch.vue';
-import { NOTIFICATION_TYPES } from './constants';
+import {
+  MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS,
+  MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES,
+  NOTIFICATION_TYPES,
+} from './constants';
 
 export default {
   components: {
@@ -33,12 +37,16 @@ export default {
       emailFlags: 'userNotificationSettings/getSelectedEmailFlags',
       pushFlags: 'userNotificationSettings/getSelectedPushFlags',
       isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
+      currentRole: 'getCurrentRole',
     }),
     hasPushAPISupport() {
       return !!('Notification' in window);
     },
     isSLAEnabled() {
       return this.isFeatureEnabledonAccount(this.accountId, FEATURE_FLAGS.SLA);
+    },
+    isCurrentUserAgent() {
+      return this.currentRole === 'agent';
     },
     filteredNotificationTypes() {
       return this.notificationTypes.filter(notification =>
@@ -57,7 +65,7 @@ export default {
       this.selectedEmailFlags = value;
     },
     pushFlags(value) {
-      this.selectedPushFlags = value;
+      this.selectedPushFlags = this.withMandatoryPushFlags(value);
     },
   },
   mounted() {
@@ -68,9 +76,25 @@ export default {
   },
   methods: {
     checkFlagStatus(type, flagType) {
+      if (this.isMandatoryPushFlag(type, flagType)) {
+        return true;
+      }
+
       const selectedFlags =
         type === 'email' ? this.selectedEmailFlags : this.selectedPushFlags;
       return selectedFlags.includes(`${type}_${flagType}`);
+    },
+    isMandatoryPushFlag(type, flagType) {
+      return (
+        this.isCurrentUserAgent &&
+        type === 'push' &&
+        MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES.includes(flagType)
+      );
+    },
+    withMandatoryPushFlags(flags = []) {
+      return this.isCurrentUserAgent
+        ? [...new Set([...flags, ...MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS])]
+        : flags;
     },
     onRegistrationSuccess() {
       this.hasEnabledPushPermissions = true;
@@ -123,7 +147,9 @@ export default {
       try {
         this.$store.dispatch('userNotificationSettings/update', {
           selectedEmailFlags: this.selectedEmailFlags,
-          selectedPushFlags: this.selectedPushFlags,
+          selectedPushFlags: this.withMandatoryPushFlags(
+            this.selectedPushFlags
+          ),
         });
         useAlert(this.$t('PROFILE_SETTINGS.FORM.API.UPDATE_SUCCESS'));
       } catch (error) {
@@ -142,6 +168,13 @@ export default {
       this.updateNotificationSettings();
     },
     handlePushInput(id) {
+      if (
+        this.isCurrentUserAgent &&
+        MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS.includes(id)
+      ) {
+        return;
+      }
+
       this.selectedPushFlags = this.toggleInput(this.selectedPushFlags, id);
       this.updateNotificationSettings();
     },
@@ -217,6 +250,7 @@ export default {
               :is-checked="
                 checkFlagStatus(type, notification.value, selectedPushFlags)
               "
+              :disabled="isMandatoryPushFlag(type, notification.value)"
               @update="id => handleInput(type, id)"
             />
           </div>
@@ -262,6 +296,7 @@ export default {
             :id="`push_${notification.value}`"
             :value="`push_${notification.value}`"
             :is-checked="checkFlagStatus('push', notification.value)"
+            :disabled="isMandatoryPushFlag('push', notification.value)"
             @update="handlePushInput"
           />
           <span class="text-body-main text-n-slate-12">{{

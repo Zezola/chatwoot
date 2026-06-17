@@ -101,7 +101,6 @@ class ActionCableConnector extends BaseActionCableConnector {
       conversation: { last_activity_at: lastActivityAt },
       conversation_id: conversationId,
     } = data;
-    DashboardAudioNotificationHelper.onNewMessage(data);
     this.app.$store.dispatch('addMessage', data);
     this.app.$store.dispatch('updateConversationLastActivity', {
       lastActivityAt,
@@ -203,6 +202,7 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onNotificationCreated = data => {
+    DashboardAudioNotificationHelper.onNotificationCreated();
     this.app.$store.dispatch('notifications/addNotification', data);
   };
 

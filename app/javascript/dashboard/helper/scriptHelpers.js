@@ -6,12 +6,21 @@ import {
 import AnalyticsHelper from './AnalyticsHelper';
 import DashboardAudioNotificationHelper from './AudioAlerts/DashboardAudioNotificationHelper';
 import { emitter } from 'shared/helpers/mitt';
+import {
+  FORCED_AGENT_AUDIO_ALERT_TYPE,
+  FORCED_AGENT_AUDIO_TONE,
+} from 'dashboard/routes/dashboard/settings/profile/constants';
 
 export const initializeAnalyticsEvents = () => {
   AnalyticsHelper.init();
   emitter.on(ANALYTICS_IDENTITY, ({ user }) => {
     AnalyticsHelper.identify(user);
   });
+};
+
+const isAgentUser = user => {
+  const { accounts = [], account_id: accountId } = user || {};
+  return accounts.find(account => account.id === accountId)?.role === 'agent';
 };
 
 export const initializeAudioAlerts = user => {
@@ -27,8 +36,12 @@ export const initializeAudioAlerts = user => {
 
   DashboardAudioNotificationHelper.set({
     currentUser: user,
-    audioAlertType: audioAlertType || 'none',
-    audioAlertTone: audioAlertTone || 'ding',
+    audioAlertType: isAgentUser(user)
+      ? FORCED_AGENT_AUDIO_ALERT_TYPE
+      : audioAlertType || 'none',
+    audioAlertTone: isAgentUser(user)
+      ? FORCED_AGENT_AUDIO_TONE
+      : audioAlertTone || 'ding',
     alwaysPlayAudioAlert: alwaysPlayAudioAlert || false,
     alertIfUnreadConversationExist: alertIfUnreadConversationExist || false,
   });

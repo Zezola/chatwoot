@@ -12,6 +12,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['update']);
@@ -46,6 +50,8 @@ const selectedValue = computed({
 });
 
 const setValue = (isChecked, value) => {
+  if (props.disabled) return;
+
   let updatedValue = selectedValue.value;
   if (isChecked) {
     updatedValue.push(value);
@@ -82,6 +88,7 @@ const alertDescription = computed(() => {
         <CheckBox
           :id="`checkbox-${option.value}`"
           :is-checked="selectedValue.includes(option.value)"
+          :disabled="disabled"
           @update="(_val, isChecked) => setValue(isChecked, option.value)"
         />
         <label

@@ -24,7 +24,11 @@ class Api::V1::Accounts::NotificationSettingsController < Api::V1::Accounts::Bas
   end
 
   def update_flags
-    @notification_setting.selected_email_flags = notification_setting_params[:selected_email_flags]
-    @notification_setting.selected_push_flags = notification_setting_params[:selected_push_flags]
+    settings_params = notification_setting_params
+    @notification_setting.selected_email_flags = settings_params[:selected_email_flags] if settings_params.key?(:selected_email_flags)
+
+    return unless settings_params.key?(:selected_push_flags)
+
+    @notification_setting.selected_push_flags = @notification_setting.with_mandatory_push_flags(settings_params[:selected_push_flags])
   end
 end
