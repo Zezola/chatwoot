@@ -39,6 +39,7 @@ export const NOTIFICATION_TYPES = [
 export const MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES = [
   'conversation_assignment',
   'conversation_mention',
+  'assigned_conversation_new_message',
   'participating_conversation_new_message',
 ];
 

@@ -177,6 +177,7 @@ class Notification < ApplicationRecord
   def user_subscribed_to_notification?(delivery_type)
     notification_setting = user.notification_settings.find_by(account_id: account.id)
     return false if notification_setting.blank?
+    return true if delivery_type == 'push' && notification_setting.mandatory_push_notification_type?(notification_type)
 
     # Check if the user has subscribed to the specified type of notification
     notification_setting.public_send("#{delivery_type}_#{notification_type}?")

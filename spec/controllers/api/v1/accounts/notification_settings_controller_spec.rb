@@ -93,7 +93,7 @@ RSpec.describe 'Notification Settings API', type: :request do
         json_response = response.parsed_body
         expect(json_response['selected_push_flags']).to match_array(NotificationSetting::MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS)
         expect(json_response['selected_push_flags']).not_to include('push_conversation_creation')
-        expect(json_response['selected_push_flags']).not_to include('push_assigned_conversation_new_message')
+        expect(json_response['selected_push_flags']).to include('push_assigned_conversation_new_message')
         expect(json_response['selected_push_flags']).not_to include('push_sla_missed_first_response')
       end
 

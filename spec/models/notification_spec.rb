@@ -164,6 +164,51 @@ RSpec.describe Notification do
       notification = create(:notification, notification_type: 'conversation_mention')
       expect(Notification::RemoveDuplicateNotificationJob).to have_received(:perform_later).with(notification)
     end
+
+    it 'enqueues push for mandatory agent push notifications when saved flags are turned off' do
+      account = create(:account)
+      agent = create(:user, account: account, role: :agent)
+      notification_setting = agent.notification_settings.find_by(account_id: account.id)
+      notification_setting.selected_push_flags = []
+      notification_setting.save!
+
+      allow(Notification::PushNotificationJob).to receive(:perform_later)
+      conversation = create(:conversation, account: account)
+      message = create(
+        :message,
+        sender: create(:user),
+        conversation: conversation,
+        content: Faker::Lorem.paragraphs(number: 2)
+      )
+      notification = create(
+        :notification,
+        user: agent,
+        account: account,
+        notification_type: 'assigned_conversation_new_message',
+        primary_actor: message.conversation,
+        secondary_actor: message
+      )
+
+      expect(Notification::PushNotificationJob).to have_received(:perform_later).with(notification)
+    end
+
+    it 'does not force push notification jobs for administrators' do
+      account = create(:account)
+      admin = create(:user, account: account, role: :administrator)
+      notification_setting = admin.notification_settings.find_by(account_id: account.id)
+      notification_setting.selected_push_flags = []
+      notification_setting.save!
+
+      allow(Notification::PushNotificationJob).to receive(:perform_later)
+      notification = create(
+        :notification,
+        user: admin,
+        account: account,
+        notification_type: 'assigned_conversation_new_message'
+      )
+
+      expect(Notification::PushNotificationJob).not_to have_received(:perform_later).with(notification)
+    end
   end
 
   context 'when fcm push data' do
