@@ -22,7 +22,6 @@ class NotificationSetting < ApplicationRecord
   MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES = %w[
     conversation_assignment
     conversation_mention
-    assigned_conversation_new_message
     participating_conversation_new_message
   ].freeze
 
