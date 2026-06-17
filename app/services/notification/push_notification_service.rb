@@ -4,6 +4,7 @@ class Notification::PushNotificationService
   pattr_initialize [:notification!]
 
   def perform
+    return unless allowed_by_virti_acl?
     return unless user_subscribed_to_notification?
 
     notification_subscriptions.each do |subscription|
@@ -19,8 +20,15 @@ class Notification::PushNotificationService
   delegate :notification_subscriptions, to: :user
   delegate :notification_settings, to: :user
 
+  def allowed_by_virti_acl?
+    Virti::Acl::NotificationPolicy.new(user: user, account: notification.account, notification: notification).show?
+  end
+
   def user_subscribed_to_notification?
     notification_setting = notification_settings.find_by(account_id: notification.account.id)
+    return false if notification_setting.blank?
+    return true if notification_setting.mandatory_push_notification_type?(notification.notification_type)
+
     return true if notification_setting.public_send("push_#{notification.notification_type}?")
 
     false

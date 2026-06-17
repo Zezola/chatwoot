@@ -19,6 +19,14 @@ class NotificationSetting < ApplicationRecord
   # used for single column multi flags
   include FlagShihTzu
 
+  MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES = %w[
+    conversation_assignment
+    conversation_mention
+    participating_conversation_new_message
+  ].freeze
+
+  MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS = MANDATORY_AGENT_PUSH_NOTIFICATION_TYPES.map { |type| "push_#{type}" }.freeze
+
   belongs_to :account
   belongs_to :user
 
@@ -32,4 +40,26 @@ class NotificationSetting < ApplicationRecord
 
   has_flags EMAIL_NOTIFICATION_FLAGS.merge(column: 'email_flags').merge(DEFAULT_QUERY_SETTING)
   has_flags PUSH_NOTIFICATION_FLAGS.merge(column: 'push_flags').merge(DEFAULT_QUERY_SETTING)
+
+  def mandatory_push_notification_type?(notification_type)
+    mandatory_push_notification_flags.include?("push_#{notification_type}")
+  end
+
+  def with_mandatory_push_flags(flags)
+    Array(flags).map(&:to_s) | mandatory_push_notification_flags
+  end
+
+  def selected_push_flags_with_mandatory
+    with_mandatory_push_flags(selected_push_flags)
+  end
+
+  private
+
+  def mandatory_push_notification_flags
+    account_user&.agent? ? MANDATORY_AGENT_PUSH_NOTIFICATION_FLAGS : []
+  end
+
+  def account_user
+    @account_user ||= AccountUser.find_by(account_id: account_id, user_id: user_id)
+  end
 end

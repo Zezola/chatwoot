@@ -56,6 +56,20 @@ describe Notification::EmailNotificationService do
       end
     end
 
+    context 'when Virti ACL denies access to the conversation' do
+      before do
+        other_agent = create(:user, account: account, role: :agent)
+        create(:inbox_member, inbox: conversation.inbox, user: other_agent)
+        conversation.update!(assignee: other_agent)
+        restrict_conversation_acl(agent)
+      end
+
+      it 'does not send email' do
+        expect(AgentNotifications::ConversationNotificationsMailer).not_to receive(:with)
+        described_class.new(notification: notification).perform
+      end
+    end
+
     context 'when user is not subscribed to notification type' do
       before do
         notification_setting = agent.notification_settings.find_by(account_id: account.id)
@@ -68,5 +82,14 @@ describe Notification::EmailNotificationService do
         described_class.new(notification: notification).perform
       end
     end
+  end
+
+  def restrict_conversation_acl(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
   end
 end
