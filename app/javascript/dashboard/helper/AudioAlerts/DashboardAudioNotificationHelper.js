@@ -1,8 +1,15 @@
+import { MESSAGE_TYPE } from 'shared/constants/messages';
 import { showBadgeOnFavicon } from './faviconHelper';
 import { initFaviconSwitcher } from './faviconHelper';
 
+import { EVENT_TYPES } from 'dashboard/routes/dashboard/settings/profile/constants.js';
 import GlobalStore from 'dashboard/store';
 import AudioNotificationStore from './AudioNotificationStore';
+import {
+  isConversationAssignedToMe,
+  isConversationUnassigned,
+  isMessageFromCurrentUser,
+} from './AudioMessageHelper';
 import WindowVisibilityHelper from './WindowVisibilityHelper';
 import { useAlert } from 'dashboard/composables';
 
@@ -130,6 +137,80 @@ export class DashboardAudioNotificationHelper {
     if (!alertIfUnreadConversationExist) return;
 
     this.resetRecurringTimer();
+  };
+
+  shouldNotifyOnMessage = message => {
+    const { audioAlertType } = this.notificationConfig;
+    if (audioAlertType.includes('none')) return false;
+    if (audioAlertType.includes('all')) return true;
+
+    const assignedToMe = isConversationAssignedToMe(
+      message,
+      this.currentUser.id
+    );
+    const isUnassigned = isConversationUnassigned(message);
+
+    const shouldPlayAudio = [];
+
+    if (
+      audioAlertType.includes(EVENT_TYPES.ASSIGNED) ||
+      audioAlertType.includes('mine')
+    ) {
+      shouldPlayAudio.push(assignedToMe);
+    }
+    if (audioAlertType.includes(EVENT_TYPES.UNASSIGNED)) {
+      shouldPlayAudio.push(isUnassigned);
+    }
+    if (audioAlertType.includes(EVENT_TYPES.NOTME)) {
+      shouldPlayAudio.push(!isUnassigned && !assignedToMe);
+    }
+
+    return shouldPlayAudio.some(Boolean);
+  };
+
+  onNewMessage = message => {
+    // If the user does not have the permission to view the conversation, then dismiss the alert
+    // FIX ME: There shouldn't be a new message if the user has no access to the conversation.
+    if (!this.store.hasConversationPermission(this.currentUser)) {
+      return;
+    }
+
+    // If the conversation status is pending, then dismiss the alert
+    // This case is common for all audio event types
+    if (this.store.isMessageFromPendingConversation(message)) {
+      return;
+    }
+
+    // If the message is sent by the current user then dismiss the alert
+    if (isMessageFromCurrentUser(message, this.currentUser.id)) {
+      return;
+    }
+
+    if (!this.shouldNotifyOnMessage(message)) {
+      return;
+    }
+
+    // If the message type is not incoming or private, then dismiss the alert
+    const { message_type: messageType, private: isPrivate } = message;
+    if (messageType !== MESSAGE_TYPE.INCOMING && !isPrivate) {
+      return;
+    }
+
+    if (WindowVisibilityHelper.isWindowVisible()) {
+      // If the user looking at the conversation, then dismiss the alert
+      if (this.store.isMessageFromCurrentConversation(message)) {
+        return;
+      }
+
+      // If the user has disabled alerts when active on the dashboard, the dismiss the alert
+      if (this.notificationConfig.playAlertOnlyWhenHidden) {
+        return;
+      }
+    }
+
+    this.playAudioAlert();
+    showBadgeOnFavicon();
+    this.playAudioEvery30Seconds();
   };
 
   shouldNotifyOnNotification = () => {
