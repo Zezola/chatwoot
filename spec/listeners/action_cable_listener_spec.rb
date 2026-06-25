@@ -136,17 +136,91 @@ describe ActionCableListener do
 
   describe '#contact_deleted' do
     let(:event_name) { :'contact.deleted' }
-    let!(:contact) { create(:contact, account: account) }
+    let(:contact) { conversation.contact }
+    let!(:blocked_agent) { create(:user, account: account, role: :agent) }
     let(:contact_data) { contact.push_event_data.merge(account_id: contact.account_id) }
     let!(:event) { Events::Base.new(event_name, Time.zone.now, contact_data: contact_data) }
 
-    it 'sends message to account admins, inbox agents' do
+    before do
+      restrict_conversation_acl(agent, admin, blocked_agent)
+    end
+
+    it 'broadcasts contact.deleted only to users authorized by Virti ACL' do
+      log_action_cable_characterization('contact.deleted', [agent.pubsub_token], contact_data)
+
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-        ["account_#{account.id}"],
+        [agent.pubsub_token],
         'contact.deleted',
         contact_data
       )
       listener.contact_deleted(event)
+    end
+  end
+
+  describe 'contact events' do
+    let(:contact) { conversation.contact }
+    let!(:blocked_agent) { create(:user, account: account, role: :agent) }
+
+    before do
+      restrict_conversation_acl(agent, admin, blocked_agent)
+    end
+
+    it 'broadcasts contact.created only to users authorized by Virti ACL' do
+      event = Events::Base.new(:'contact.created', Time.zone.now, contact: contact)
+      log_action_cable_characterization('contact.created', [agent.pubsub_token], contact.push_event_data)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'contact.created',
+        contact.push_event_data.merge(account_id: account.id)
+      )
+
+      listener.contact_created(event)
+    end
+
+    it 'broadcasts contact.updated only to users authorized by Virti ACL' do
+      event = Events::Base.new(:'contact.updated', Time.zone.now, contact: contact)
+      log_action_cable_characterization('contact.updated', [agent.pubsub_token], contact.push_event_data)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'contact.updated',
+        contact.push_event_data.merge(account_id: account.id)
+      )
+
+      listener.contact_updated(event)
+    end
+
+    it 'broadcasts contact.merged only to users authorized by Virti ACL' do
+      event = Events::Base.new(
+        :'contact.merged',
+        Time.zone.now,
+        contact: contact,
+        tokens: [contact.contact_inboxes.filter_map(&:pubsub_token)]
+      )
+      log_action_cable_characterization('contact.merged', [agent.pubsub_token], contact.push_event_data)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'contact.merged',
+        contact.push_event_data.merge(account_id: account.id)
+      )
+
+      listener.contact_merged(event)
+    end
+
+    it 'keeps contact.updated account-wide when Virti ACL is disabled' do
+      event = Events::Base.new(:'contact.updated', Time.zone.now, contact: contact)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        ["account_#{account.id}"],
+        'contact.updated',
+        contact.push_event_data.merge(account_id: account.id)
+      )
+
+      with_modified_env VIRTI_ACL_ENABLED: 'false' do
+        listener.contact_updated(event)
+      end
     end
   end
 
@@ -275,12 +349,18 @@ describe ActionCableListener do
     end
   end
 
-  def restrict_conversation_acl(user)
+  def restrict_conversation_acl(*users)
     model = create(
       :virti_acl_model,
       account: account,
       permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
     )
-    create(:virti_acl_user_model, account: account, user: user, model: model)
+    users.each { |user| create(:virti_acl_user_model, account: account, user: user, model: model) }
+  end
+
+  def log_action_cable_characterization(event_name, tokens, payload)
+    Rails.logger.info(
+      "[Virti ACL characterization] #{event_name} ActionCable tokens=#{tokens.inspect} payload_keys=#{payload.keys.inspect}"
+    )
   end
 end
