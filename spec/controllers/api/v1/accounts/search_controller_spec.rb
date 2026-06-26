@@ -18,6 +18,15 @@ RSpec.describe 'Search', type: :request do
                      account: account, portal: portal, author: agent, status: 'published')
   end
 
+  def create_individual_acl(user:, permissions:)
+    Virti::Acl::UserPermission.create!(
+      IdUsuario: user.id,
+      Permissoes: permissions,
+      CriadoEm: Time.current,
+      AtualizadoEm: Time.current
+    )
+  end
+
   describe 'GET /api/v1/accounts/{account.id}/search' do
     context 'when it is an unauthenticated user' do
       it 'returns unauthorized' do
@@ -43,6 +52,42 @@ RSpec.describe 'Search', type: :request do
         expect(response_data[:payload][:conversations].length).to eq 1
         expect(response_data[:payload][:contacts].length).to eq 1
         expect(response_data[:payload][:articles].length).to eq 1
+      end
+
+      it 'applies conversation ACL across aggregate search results' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        inbox = create(:inbox, account: account)
+        create(:inbox_member, user: agent, inbox: inbox)
+        own_contact = create(:contact, name: 'ACL Request Scope', email: 'acl-request-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Request Scope', email: 'acl-request-other@example.com', account: account)
+        own_conversation = create(:conversation, account: account, inbox: inbox, contact: own_contact, assignee: agent)
+        other_conversation = create(
+          :conversation,
+          account: account,
+          inbox: inbox,
+          contact: other_contact,
+          assignee: create(:user, account: account)
+        )
+        own_message = create(:message, conversation: own_conversation, account: account, inbox: inbox, content: 'ACL Request Scope')
+        create(:message, conversation: other_conversation, account: account, inbox: inbox, content: 'ACL Request Scope')
+
+        get "/api/v1/accounts/#{account.id}/search",
+            headers: agent.create_new_auth_token,
+            params: { q: 'ACL Request Scope' },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_data = JSON.parse(response.body, symbolize_names: true)
+
+        expect(response_data[:payload][:contacts].pluck(:email)).to eq([own_contact.email])
+        expect(response_data[:payload][:conversations].pluck(:id)).to eq([own_conversation.display_id])
+        expect(response_data[:payload][:messages].pluck(:id)).to eq([own_message.id])
       end
     end
   end
@@ -84,6 +129,32 @@ RSpec.describe 'Search', type: :request do
         contact_result = response_data[:payload][:contacts].first
         expect(contact_result[:last_activity_at]).to eq(contact.last_activity_at.to_i)
         expect(contact_result).not_to have_key(:created_at)
+      end
+
+      it 'applies conversation ACL to contact results' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        inbox = create(:inbox, account: account)
+        create(:inbox_member, user: agent, inbox: inbox)
+        own_contact = create(:contact, name: 'ACL HTTP Contact', email: 'acl-http-contact-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL HTTP Contact', email: 'acl-http-contact-other@example.com', account: account)
+        create(:conversation, account: account, inbox: inbox, contact: own_contact, assignee: agent)
+        create(:conversation, account: account, inbox: inbox, contact: other_contact, assignee: create(:user, account: account))
+
+        get "/api/v1/accounts/#{account.id}/search/contacts",
+            headers: agent.create_new_auth_token,
+            params: { q: 'ACL HTTP Contact' },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_data = JSON.parse(response.body, symbolize_names: true)
+
+        expect(response_data[:payload][:contacts].pluck(:email)).to eq([own_contact.email])
       end
 
       context 'with advanced_search feature enabled', :opensearch do
@@ -167,6 +238,34 @@ RSpec.describe 'Search', type: :request do
 
         expect(response_data[:payload].keys).to contain_exactly(:conversations)
         expect(response_data[:payload][:conversations].length).to eq 1
+      end
+
+      it 'applies conversation ACL to conversation results' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: agent, model: model)
+
+        inbox = create(:inbox, account: account)
+        create(:inbox_member, user: agent, inbox: inbox)
+        own_contact = create(:contact, name: 'ACL HTTP Conversation', email: 'acl-http-conversation-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL HTTP Conversation', email: 'acl-http-conversation-other@example.com', account: account)
+        own_conversation = create(:conversation, account: account, inbox: inbox, contact: own_contact, assignee: agent)
+        other_conversation = create(:conversation, account: account, inbox: inbox, contact: other_contact, assignee: create(:user, account: account))
+        create(:message, conversation: own_conversation, account: account, inbox: inbox, content: 'visible conversation message')
+        create(:message, conversation: other_conversation, account: account, inbox: inbox, content: 'hidden conversation message')
+
+        get "/api/v1/accounts/#{account.id}/search/conversations",
+            headers: agent.create_new_auth_token,
+            params: { q: 'ACL HTTP Conversation' },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_data = JSON.parse(response.body, symbolize_names: true)
+
+        expect(response_data[:payload][:conversations].pluck(:id)).to eq([own_conversation.display_id])
       end
 
       context 'with advanced_search feature enabled', :opensearch do
@@ -290,6 +389,30 @@ RSpec.describe 'Search', type: :request do
 
         expect(response_data[:payload].keys).to contain_exactly(:messages)
         expect(response_data[:payload][:messages].length).to eq 2
+      end
+
+      it 'applies individual ACL permissions to message results when the user has no ACL model' do
+        create_individual_acl(
+          user: agent,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+
+        inbox = create(:inbox, account: account)
+        create(:inbox_member, user: agent, inbox: inbox)
+        own_conversation = create(:conversation, account: account, inbox: inbox, assignee: agent)
+        other_conversation = create(:conversation, account: account, inbox: inbox, assignee: create(:user, account: account))
+        own_message = create(:message, conversation: own_conversation, account: account, inbox: inbox, content: 'ACL HTTP Message')
+        create(:message, conversation: other_conversation, account: account, inbox: inbox, content: 'ACL HTTP Message')
+
+        get "/api/v1/accounts/#{account.id}/search/messages",
+            headers: agent.create_new_auth_token,
+            params: { q: 'ACL HTTP Message' },
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        response_data = JSON.parse(response.body, symbolize_names: true)
+
+        expect(response_data[:payload][:messages].pluck(:id)).to eq([own_message.id])
       end
     end
   end
