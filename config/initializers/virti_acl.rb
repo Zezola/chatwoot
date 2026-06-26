@@ -1,29 +1,36 @@
 Rails.application.config.to_prepare do
+  prepend_once = lambda do |target, patch|
+    target.prepend(patch) unless target.ancestors.include?(patch)
+  end
+
   permission_filter_patch = Virti::Acl::Patches::PermissionFilterServicePatch
   permission_filter_service = Conversations::PermissionFilterService
-  permission_filter_service.prepend(permission_filter_patch) unless permission_filter_service.ancestors.include?(permission_filter_patch)
+  prepend_once.call(permission_filter_service, permission_filter_patch)
 
   conversations_patch = Virti::Acl::Patches::ConversationsControllerPatch
   conversations_controller = Api::V1::Accounts::ConversationsController
-  conversations_controller.prepend(conversations_patch) unless conversations_controller.ancestors.include?(conversations_patch)
+  prepend_once.call(conversations_controller, conversations_patch)
 
   conversations_base_patch = Virti::Acl::Patches::ConversationsBaseControllerPatch
   conversations_base_controller = Api::V1::Accounts::Conversations::BaseController
-  conversations_base_controller.prepend(conversations_base_patch) unless conversations_base_controller.ancestors.include?(conversations_base_patch)
+  prepend_once.call(conversations_base_controller, conversations_base_patch)
 
   assignments_patch = Virti::Acl::Patches::AssignmentsControllerPatch
   assignments_controller = Api::V1::Accounts::Conversations::AssignmentsController
-  assignments_controller.prepend(assignments_patch) unless assignments_controller.ancestors.include?(assignments_patch)
+  prepend_once.call(assignments_controller, assignments_patch)
 
   notification_builder_patch = Virti::Acl::Patches::NotificationBuilderPatch
-  NotificationBuilder.prepend(notification_builder_patch) unless NotificationBuilder.ancestors.include?(notification_builder_patch)
+  prepend_once.call(NotificationBuilder, notification_builder_patch)
 
   notification_finder_patch = Virti::Acl::Patches::NotificationFinderPatch
-  NotificationFinder.prepend(notification_finder_patch) unless NotificationFinder.ancestors.include?(notification_finder_patch)
+  prepend_once.call(NotificationFinder, notification_finder_patch)
 
   action_cable_broadcast_job_patch = Virti::Acl::Patches::ActionCableBroadcastJobPatch
-  ActionCableBroadcastJob.prepend(action_cable_broadcast_job_patch) unless ActionCableBroadcastJob.ancestors.include?(action_cable_broadcast_job_patch)
+  prepend_once.call(ActionCableBroadcastJob, action_cable_broadcast_job_patch)
 
   action_cable_listener_patch = Virti::Acl::Patches::ActionCableListenerPatch
-  ActionCableListener.prepend(action_cable_listener_patch) unless ActionCableListener.ancestors.include?(action_cable_listener_patch)
+  prepend_once.call(ActionCableListener, action_cable_listener_patch)
+
+  search_service_patch = Virti::Acl::Patches::SearchServicePatch
+  prepend_once.call(SearchService, search_service_patch)
 end

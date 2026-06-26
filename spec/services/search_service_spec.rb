@@ -25,6 +25,15 @@ describe SearchService do
     Current.account = nil
   end
 
+  def create_individual_acl(user:, permissions:)
+    Virti::Acl::UserPermission.create!(
+      IdUsuario: user.id,
+      Permissoes: permissions,
+      CriadoEm: Time.current,
+      AtualizadoEm: Time.current
+    )
+  end
+
   describe '#perform' do
     context 'when search types' do
       let(:params) { { q: 'Potter' } }
@@ -75,6 +84,112 @@ describe SearchService do
         search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
         expect(search.perform[:contacts].map(&:id)).to eq([harry4.id, harry3.id, harry2.id, harry.id])
       end
+
+      it 'returns only contacts with assigned conversations when the user cannot view all conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_contact = create(:contact, name: 'ACL Contact Scope', email: 'acl-contact-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Contact Scope', email: 'acl-contact-other@example.com', account: account)
+        create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        create(
+          :conversation,
+          contact: other_contact,
+          inbox: inbox,
+          account: account,
+          assignee: create(:user, account: account)
+        )
+
+        params = { q: 'ACL Contact Scope' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
+
+        expect(search.perform[:contacts]).to contain_exactly(own_contact)
+      end
+
+      it 'does not return contacts with assigned conversations from inaccessible inboxes' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        inaccessible_inbox = create(:inbox, account: account)
+        visible_contact = create(:contact, name: 'ACL Inbox Scope', email: 'acl-visible-inbox@example.com', account: account)
+        inaccessible_contact = create(:contact, name: 'ACL Inbox Scope', email: 'acl-hidden-inbox@example.com', account: account)
+        create(:conversation, contact: visible_contact, inbox: inbox, account: account, assignee: user)
+        create(:conversation, contact: inaccessible_contact, inbox: inaccessible_inbox, account: account, assignee: user)
+
+        params = { q: 'ACL Inbox Scope' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
+
+        expect(search.perform[:contacts]).to contain_exactly(visible_contact)
+      end
+
+      it 'applies individual ACL permissions when the user has no ACL model' do
+        create_individual_acl(
+          user: user,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+
+        own_contact = create(:contact, name: 'ACL Individual Contact', email: 'acl-individual-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Individual Contact', email: 'acl-individual-other@example.com', account: account)
+        create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+
+        params = { q: 'ACL Individual Contact' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
+
+        expect(search.perform[:contacts]).to contain_exactly(own_contact)
+      end
+
+      it 'returns contacts with assigned and unassigned conversations when the user can view unassigned conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => true }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_contact = create(:contact, name: 'ACL Contact Unassigned', email: 'acl-contact-own-unassigned@example.com', account: account)
+        unassigned_contact = create(:contact, name: 'ACL Contact Unassigned', email: 'acl-contact-unassigned@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Contact Unassigned', email: 'acl-contact-other-unassigned@example.com', account: account)
+        create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        create(:conversation, contact: unassigned_contact, inbox: inbox, account: account, assignee: nil)
+        create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+
+        params = { q: 'ACL Contact Unassigned' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
+
+        expect(search.perform[:contacts]).to contain_exactly(own_contact, unassigned_contact)
+      end
+
+      it 'does not restrict contacts when the user can view all conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => true, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        contact_without_conversation = create(
+          :contact,
+          name: 'ACL Contact Full Access',
+          email: 'acl-full-no-conversation@example.com',
+          account: account
+        )
+        other_contact = create(:contact, name: 'ACL Contact Full Access', email: 'acl-full-other@example.com', account: account)
+        create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+
+        params = { q: 'ACL Contact Full Access' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Contact')
+
+        expect(search.perform[:contacts]).to contain_exactly(contact_without_conversation, other_contact)
+      end
     end
 
     context 'when message search' do
@@ -88,6 +203,118 @@ describe SearchService do
         params = { q: 'Harry' }
         search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Message')
         expect(search.perform[:messages].map(&:id)).to eq([message2.id, message.id])
+      end
+
+      it 'returns only messages from assigned conversations when the user cannot view all conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_conversation = create(:conversation, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(:conversation, inbox: inbox, account: account, assignee: create(:user, account: account))
+        own_message = create(:message, conversation: own_conversation, inbox: inbox, account: account, content: 'ACL message scope')
+        create(:message, conversation: other_conversation, inbox: inbox, account: account, content: 'ACL message scope')
+
+        params = { q: 'ACL message scope' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Message')
+
+        expect(search.perform[:messages]).to contain_exactly(own_message)
+      end
+
+      it 'applies individual ACL permissions to messages when the user has no ACL model' do
+        create_individual_acl(
+          user: user,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+
+        own_conversation = create(:conversation, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(:conversation, inbox: inbox, account: account, assignee: create(:user, account: account))
+        own_message = create(:message, conversation: own_conversation, inbox: inbox, account: account, content: 'ACL individual message')
+        create(:message, conversation: other_conversation, inbox: inbox, account: account, content: 'ACL individual message')
+
+        params = { q: 'ACL individual message' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Message')
+
+        expect(search.perform[:messages]).to contain_exactly(own_message)
+      end
+
+      it 'returns messages from assigned and unassigned conversations when the user can view unassigned conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => true }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_conversation = create(:conversation, inbox: inbox, account: account, assignee: user)
+        unassigned_conversation = create(:conversation, inbox: inbox, account: account, assignee: nil)
+        other_conversation = create(:conversation, inbox: inbox, account: account, assignee: create(:user, account: account))
+        own_message = create(:message, conversation: own_conversation, inbox: inbox, account: account, content: 'ACL unassigned message')
+        unassigned_message = create(
+          :message,
+          conversation: unassigned_conversation,
+          inbox: inbox,
+          account: account,
+          content: 'ACL unassigned message'
+        )
+        create(:message, conversation: other_conversation, inbox: inbox, account: account, content: 'ACL unassigned message')
+
+        params = { q: 'ACL unassigned message' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Message')
+
+        expect(search.perform[:messages]).to contain_exactly(own_message, unassigned_message)
+      end
+
+      it 'does not allow the sender filter to bypass hidden conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+        allow(ChatwootApp).to receive(:advanced_search_allowed?).and_return(false)
+        allow(account).to receive(:feature_enabled?).and_call_original
+        allow(account).to receive(:feature_enabled?).with('advanced_search').and_return(true)
+        allow(account).to receive(:feature_enabled?).with('search_with_gin').and_return(false)
+
+        hidden_contact = create(:contact, account: account)
+        hidden_conversation = create(
+          :conversation,
+          contact: hidden_contact,
+          inbox: inbox,
+          account: account,
+          assignee: create(:user, account: account)
+        )
+        create(:message, conversation: hidden_conversation, inbox: inbox, account: account, sender: hidden_contact, content: 'ACL sender bypass')
+
+        params = { q: 'ACL sender bypass', from: "contact:#{hidden_contact.id}" }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Message')
+
+        expect(search.perform[:messages]).to be_empty
+      end
+
+      it 'applies conversation ACL when using GIN message search' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+        allow(account).to receive(:feature_enabled?).and_call_original
+        allow(account).to receive(:feature_enabled?).with('search_with_gin').and_return(true)
+
+        own_conversation = create(:conversation, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(:conversation, inbox: inbox, account: account, assignee: create(:user, account: account))
+        own_message = create(:message, conversation: own_conversation, inbox: inbox, account: account, content: 'acl gin scope')
+        create(:message, conversation: other_conversation, inbox: inbox, account: account, content: 'acl gin scope')
+
+        params = { q: 'acl gin scope' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Message')
+
+        expect(search.perform[:messages]).to contain_exactly(own_message)
       end
 
       context 'with feature flag for search type' do
@@ -258,6 +485,137 @@ describe SearchService do
         params = { q: new_converstion.display_id }
         search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
         expect(search.perform[:conversations].map(&:id)).to include new_converstion.id
+      end
+
+      it 'returns only assigned conversations when the user cannot view all conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_contact = create(:contact, name: 'ACL Scoped Customer', email: 'acl-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Scoped Customer', email: 'acl-other@example.com', account: account)
+        own_conversation = create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(
+          :conversation,
+          contact: other_contact,
+          inbox: inbox,
+          account: account,
+          assignee: create(:user, account: account)
+        )
+
+        params = { q: 'ACL Scoped' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
+
+        expect(search.perform[:conversations]).to contain_exactly(own_conversation)
+        expect(search.perform[:conversations]).not_to include(other_conversation)
+      end
+
+      it 'returns assigned and unassigned conversations when the user can view unassigned conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => true }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_contact = create(:contact, name: 'ACL Scoped Customer Assigned To User', email: 'acl-own@example.com', account: account)
+        unassigned_contact = create(:contact, name: 'ACL Scoped Customer Unassigned', email: 'acl-unassigned@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Scoped Customer Assigned To Other User', email: 'acl-other@example.com', account: account)
+
+        own_conversation = create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        unassigned_conversation = create(:conversation, contact: unassigned_contact, inbox: inbox, account: account, assignee: nil)
+        other_conversation = create(
+          :conversation,
+          contact: other_contact,
+          inbox: inbox,
+          account: account,
+          assignee: create(:user, account: account)
+        )
+
+        params = { q: 'ACL Scoped Customer' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
+        results = search.perform[:conversations]
+
+        expect(results).to contain_exactly(own_conversation, unassigned_conversation)
+        expect(results).not_to include(other_conversation)
+      end
+
+      it 'applies individual ACL permissions to conversations when the user has no ACL model' do
+        create_individual_acl(
+          user: user,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+
+        own_contact = create(:contact, name: 'ACL Individual Conversation', email: 'acl-conversation-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Individual Conversation', email: 'acl-conversation-other@example.com', account: account)
+        own_conversation = create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+
+        params = { q: 'ACL Individual Conversation' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
+
+        expect(search.perform[:conversations]).to contain_exactly(own_conversation)
+      end
+
+      it 'does not restrict conversations when the user has no ACL record' do
+        own_contact = create(:contact, name: 'ACL Default Conversation', email: 'acl-default-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Default Conversation', email: 'acl-default-other@example.com', account: account)
+        own_conversation = create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+
+        params = { q: 'ACL Default Conversation' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
+
+        expect(search.perform[:conversations]).to contain_exactly(own_conversation, other_conversation)
+      end
+
+      it 'does not restrict conversations when the user can view all conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => true, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_contact = create(:contact, name: 'ACL Full Conversation', email: 'acl-full-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL Full Conversation', email: 'acl-full-other@example.com', account: account)
+        own_conversation = create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+
+        params = { q: 'ACL Full Conversation' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'Conversation')
+
+        expect(search.perform[:conversations]).to contain_exactly(own_conversation, other_conversation)
+      end
+    end
+
+    context 'when searching all result types' do
+      it 'applies conversation ACL to contacts, messages, and conversations' do
+        model = create(
+          :virti_acl_model,
+          account: account,
+          permissions: { 'pode_ver_aba_de_todas_conversas' => false, 'pode_ver_aba_de_nao_atribuidas' => false }
+        )
+        create(:virti_acl_user_model, account: account, user: user, model: model)
+
+        own_contact = create(:contact, name: 'ACL All Scope', email: 'acl-all-own@example.com', account: account)
+        other_contact = create(:contact, name: 'ACL All Scope', email: 'acl-all-other@example.com', account: account)
+        own_conversation = create(:conversation, contact: own_contact, inbox: inbox, account: account, assignee: user)
+        other_conversation = create(:conversation, contact: other_contact, inbox: inbox, account: account, assignee: create(:user, account: account))
+        own_message = create(:message, conversation: own_conversation, inbox: inbox, account: account, content: 'ACL All Scope')
+        other_message = create(:message, conversation: other_conversation, inbox: inbox, account: account, content: 'ACL All Scope')
+
+        params = { q: 'ACL All Scope' }
+        search = described_class.new(current_user: user, current_account: account, params: params, search_type: 'all')
+        results = search.perform
+
+        expect(results[:contacts]).to contain_exactly(own_contact)
+        expect(results[:messages]).to contain_exactly(own_message)
+        expect(results[:conversations]).to contain_exactly(own_conversation)
+        expect(results[:messages]).not_to include(other_message)
       end
     end
 
