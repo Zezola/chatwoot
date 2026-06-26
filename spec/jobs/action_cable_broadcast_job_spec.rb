@@ -62,10 +62,27 @@ RSpec.describe ActionCableBroadcastJob do
     expect_no_broadcast_to(blocked_agent.pubsub_token)
   end
 
-  it 'keeps non-conversation events unchanged' do
-    payload = { account_id: account.id, id: conversation.contact_id }
+  it 'does not send contact events to users blocked by Virti ACL' do
+    payload = conversation.contact.push_event_data.merge(account_id: account.id)
+    event_names = %w[contact.created contact.updated contact.merged contact.deleted]
+    tokens = [allowed_agent.pubsub_token, blocked_agent.pubsub_token, "account_#{account.id}"]
 
-    perform_job([blocked_agent.pubsub_token], 'contact.updated', payload)
+    event_names.each do |event_name|
+      log_action_cable_characterization(event_name, tokens, payload)
+      perform_job(tokens, event_name, payload)
+
+      expect_broadcast_to(allowed_agent.pubsub_token, event_name, payload)
+      expect_no_broadcast_to(blocked_agent.pubsub_token)
+      expect_no_broadcast_to("account_#{account.id}")
+    end
+  end
+
+  it 'keeps contact event behavior unchanged when Virti ACL is disabled' do
+    payload = conversation.contact.push_event_data.merge(account_id: account.id)
+
+    with_modified_env VIRTI_ACL_ENABLED: 'false' do
+      perform_job([blocked_agent.pubsub_token], 'contact.updated', payload)
+    end
 
     expect_broadcast_to(blocked_agent.pubsub_token, 'contact.updated', payload)
   end
@@ -79,6 +96,26 @@ RSpec.describe ActionCableBroadcastJob do
     end
 
     expect_broadcast_to(blocked_agent.pubsub_token, 'message.created', payload)
+  end
+
+  it 'classifies all conversation and message ActionCable listener events for Virti ACL filtering' do
+    expected_event_names = [
+      Events::Types::MESSAGE_CREATED,
+      Events::Types::MESSAGE_UPDATED,
+      Events::Types::FIRST_REPLY_CREATED,
+      Events::Types::CONVERSATION_CREATED,
+      Events::Types::CONVERSATION_UPDATED,
+      Events::Types::CONVERSATION_READ,
+      Events::Types::CONVERSATION_STATUS_CHANGED,
+      Events::Types::CONVERSATION_TYPING_ON,
+      Events::Types::CONVERSATION_TYPING_OFF,
+      Events::Types::ASSIGNEE_CHANGED,
+      Events::Types::TEAM_CHANGED,
+      Events::Types::CONVERSATION_CONTACT_CHANGED,
+      Events::Types::CONVERSATION_MENTIONED
+    ]
+
+    expect(Virti::Acl::Patches::ActionCableBroadcastJobPatch::CONVERSATION_EVENT_NAMES).to include(*expected_event_names)
   end
 
   def perform_job(members, event_name, payload)
@@ -107,5 +144,11 @@ RSpec.describe ActionCableBroadcastJob do
 
   def expect_no_broadcast_to(token)
     expect(server).not_to have_received(:broadcast).with(token, anything)
+  end
+
+  def log_action_cable_characterization(event_name, tokens, payload)
+    Rails.logger.info(
+      "[Virti ACL characterization] #{event_name} ActionCable tokens=#{tokens.inspect} payload_keys=#{payload.keys.inspect}"
+    )
   end
 end

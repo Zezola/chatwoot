@@ -31,6 +31,9 @@ Rails.application.config.to_prepare do
   action_cable_listener_patch = Virti::Acl::Patches::ActionCableListenerPatch
   prepend_once.call(ActionCableListener, action_cable_listener_patch)
 
+  room_channel_patch = Virti::Acl::Patches::RoomChannelPatch
+  prepend_once.call(RoomChannel, room_channel_patch)
+
   search_service_patch = Virti::Acl::Patches::SearchServicePatch
   prepend_once.call(SearchService, search_service_patch)
 end

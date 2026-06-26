@@ -1,5 +1,6 @@
 <script setup>
 import { computed, useTemplateRef } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useElementSize } from '@vueuse/core';
 import { REPLY_EDITOR_MODES } from './constants';
 
@@ -19,6 +20,8 @@ const props = defineProps({
 });
 
 defineEmits(['toggleMode']);
+
+const { t } = useI18n();
 
 const wootEditorReplyMode = useTemplateRef('wootEditorReplyMode');
 const wootEditorPrivateMode = useTemplateRef('wootEditorPrivateMode');
@@ -75,6 +78,31 @@ const toggleClass = computed(() => {
 const activeChipClass = computed(() => {
   return isPrivate.value ? 'bg-[#ffe1a6]' : 'bg-white/70';
 });
+
+const abbreviateReplyBoxLabel = label => {
+  const replyPrefix = 'Responder ';
+  const replyToTeamPrefix = 'Responder para o ';
+  const prefix = label.startsWith(replyToTeamPrefix)
+    ? replyToTeamPrefix
+    : replyPrefix;
+
+  if (!label.startsWith(prefix)) return label;
+
+  const remainingText = label.slice(prefix.length);
+  return `Resp. ${remainingText.charAt(0).toUpperCase()}${remainingText.slice(1)}`;
+};
+
+const replyLabel = computed(() => t('CONVERSATION.REPLYBOX.REPLY'));
+const privateNoteLabel = computed(() =>
+  t('CONVERSATION.REPLYBOX.PRIVATE_NOTE')
+);
+
+const mobileReplyLabel = computed(() =>
+  abbreviateReplyBoxLabel(replyLabel.value)
+);
+const mobilePrivateNoteLabel = computed(() =>
+  abbreviateReplyBoxLabel(privateNoteLabel.value)
+);
 </script>
 
 <template>
@@ -90,10 +118,12 @@ const activeChipClass = computed(() => {
     @click="$emit('toggleMode')"
   >
     <div ref="wootEditorReplyMode" class="flex items-center gap-1 px-2 z-20">
-      {{ $t('CONVERSATION.REPLYBOX.REPLY') }}
+      <span class="hidden xs:inline">{{ replyLabel }}</span>
+      <span class="xs:hidden">{{ mobileReplyLabel }}</span>
     </div>
     <div ref="wootEditorPrivateMode" class="flex items-center gap-1 px-2 z-20">
-      {{ $t('CONVERSATION.REPLYBOX.PRIVATE_NOTE') }}
+      <span class="hidden xs:inline">{{ privateNoteLabel }}</span>
+      <span class="xs:hidden">{{ mobilePrivateNoteLabel }}</span>
     </div>
     <div
       class="absolute shadow-sm rounded-full h-6 w-[var(--chip-width)] ease-in-out translate-x-[var(--translate-x)] rtl:translate-x-[var(--rtl-translate-x)]"

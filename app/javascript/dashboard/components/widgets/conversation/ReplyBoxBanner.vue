@@ -113,7 +113,7 @@ const onClickBotHandoff = async () => {
     v-if="showSelfAssignBanner && !showBotHandoffBanner"
     action-button-variant="ghost"
     color-scheme="secondary"
-    class="mx-2 mb-2 rounded-lg !py-2"
+    class="mx-2 mb-2 rounded-lg !h-auto min-h-12 !items-start xs:!items-center !justify-start !gap-2 xs:!gap-4 !py-2 [&_.banner-message]:!block [&_.banner-message]:min-w-0 [&_.banner-message]:whitespace-normal [&_.banner-message]:break-words [&_.actions]:shrink-0"
     :banner-message="$t('CONVERSATION.NOT_ASSIGNED_TO_YOU')"
     has-action-button
     :action-button-label="$t('CONVERSATION.ASSIGN_TO_ME')"
@@ -123,7 +123,7 @@ const onClickBotHandoff = async () => {
     v-if="showBotHandoffBanner"
     action-button-variant="ghost"
     color-scheme="secondary"
-    class="mx-2 mb-2 rounded-lg !py-2"
+    class="mx-2 mb-2 rounded-lg !h-auto min-h-12 !items-start xs:!items-center !justify-start !gap-2 xs:!gap-4 !py-2 [&_.banner-message]:!block [&_.banner-message]:min-w-0 [&_.banner-message]:whitespace-normal [&_.banner-message]:break-words [&_.actions]:shrink-0"
     :banner-message="$t('CONVERSATION.BOT_HANDOFF_MESSAGE')"
     has-action-button
     :action-button-label="botHandoffActionLabel"
