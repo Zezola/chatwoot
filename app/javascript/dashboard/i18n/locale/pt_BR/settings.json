@@ -274,6 +274,13 @@
         "STEP_2": "Toque em Adicionar à Tela de Início.",
         "STEP_3": "Abra o Chatwoot pelo novo atalho criado na Tela de Início.",
         "STEP_4": "Permita as notificações quando o Safari pedir a confirmação."
+      },
+      "MODAL": {
+        "TITLE": "Suas notificações estão desativadas",
+        "DESCRIPTION": "Com as notificações desligadas você não será avisado quando uma nova conversa chegar ou alguém responder — pode perder eventos importantes e demorar a responder. Ative para acompanhar cada conversa em tempo real e não deixar nenhum cliente esperando.",
+        "ENABLE_ACTION": "Ativar notificações",
+        "DISMISS_ACTION": "Não nesse momento",
+        "DONT_ASK_AGAIN": "Não perguntar mais"
       }
     }
   },

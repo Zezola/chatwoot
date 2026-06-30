@@ -1,6 +1,8 @@
 <script>
 import Banner from 'dashboard/components/ui/Banner.vue';
 import Modal from '../Modal.vue';
+import Dialog from 'dashboard/components-next/dialog/Dialog.vue';
+import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
 import {
   requestPushPermissions,
   verifyServiceWorkerExistence,
@@ -12,6 +14,8 @@ export default {
   components: {
     Banner,
     Modal,
+    Dialog,
+    Checkbox,
   },
   props: {
     accountId: {
@@ -29,6 +33,8 @@ export default {
       isInstructionModalOpen: false,
       isDismissed: false,
       permissionState: 'default',
+      dontAskAgain: false,
+      hasEvaluatedModal: false,
     };
   },
   computed: {
@@ -105,6 +111,21 @@ export default {
     closeButtonLabel() {
       return this.$t('APP_GLOBAL.PUSH_NOTIFICATION_BANNER.DISMISS_ACTION');
     },
+    shouldShowModal() {
+      if (this.isDismissed) {
+        return false;
+      }
+
+      if (this.shouldShowIOSInstructions || !this.supportsPushNotifications) {
+        return false;
+      }
+
+      if (this.permissionState === 'denied') {
+        return false;
+      }
+
+      return !(this.permissionState === 'granted' && this.hasPushSubscription);
+    },
   },
   watch: {
     storageKey() {
@@ -144,6 +165,7 @@ export default {
 
       if (this.shouldShowIOSInstructions || !this.supportsPushNotifications) {
         this.hasPushSubscription = false;
+        this.maybeOpenModal();
         return;
       }
 
@@ -156,7 +178,31 @@ export default {
           .catch(() => {
             this.hasPushSubscription = false;
           })
+          .finally(() => {
+            this.maybeOpenModal();
+          })
       );
+    },
+    maybeOpenModal() {
+      if (this.hasEvaluatedModal) {
+        return;
+      }
+      this.hasEvaluatedModal = true;
+
+      if (this.shouldShowModal) {
+        this.$refs.pushModalDialog?.open();
+      }
+    },
+    enableFromModal() {
+      requestPushPermissions({
+        onSuccess: this.syncPushState,
+      });
+      this.$refs.pushModalDialog?.close();
+    },
+    dismissModal() {
+      if (this.dontAskAgain) {
+        this.dismissBanner();
+      }
     },
     triggerPrimaryAction() {
       if (this.shouldShowIOSInstructions) {
@@ -182,9 +228,34 @@ export default {
     action-button-icon="i-lucide-bell"
     :has-action-button="shouldShowActionButton"
     has-close-button
+    hide-message-on-mobile
     @primary-action="triggerPrimaryAction"
     @close="dismissBanner"
   />
+
+  <Dialog
+    ref="pushModalDialog"
+    type="edit"
+    :title="$t('APP_GLOBAL.PUSH_NOTIFICATION_BANNER.MODAL.TITLE')"
+    :confirm-button-label="
+      $t('APP_GLOBAL.PUSH_NOTIFICATION_BANNER.MODAL.ENABLE_ACTION')
+    "
+    :cancel-button-label="
+      $t('APP_GLOBAL.PUSH_NOTIFICATION_BANNER.MODAL.DISMISS_ACTION')
+    "
+    @confirm="enableFromModal"
+    @close="dismissModal"
+  >
+    <p class="mb-0 text-sm text-n-slate-11">
+      {{ $t('APP_GLOBAL.PUSH_NOTIFICATION_BANNER.MODAL.DESCRIPTION') }}
+    </p>
+    <label class="flex items-center gap-2 cursor-pointer">
+      <Checkbox v-model="dontAskAgain" />
+      <span class="text-sm text-n-slate-12">
+        {{ $t('APP_GLOBAL.PUSH_NOTIFICATION_BANNER.MODAL.DONT_ASK_AGAIN') }}
+      </span>
+    </label>
+  </Dialog>
 
   <Modal
     v-model:show="isInstructionModalOpen"

@@ -48,6 +48,10 @@ export default {
       type: String,
       default: '',
     },
+    hideMessageOnMobile: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ['primaryAction', 'close'],
   computed: {
@@ -88,7 +92,10 @@ export default {
     class="flex items-center justify-center h-12 gap-4 px-4 py-3 text-xs text-white banner dark:text-white woot-banner"
     :class="bannerClasses"
   >
-    <span class="banner-message">
+    <span
+      class="banner-message"
+      :class="{ 'hidden sm:flex': hideMessageOnMobile }"
+    >
       {{ bannerMessage }}
       <a
         v-if="hrefLink"
