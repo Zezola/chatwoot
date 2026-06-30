@@ -3,6 +3,7 @@ module Virti::Acl::Patches::ContactsBulkActionServicePatch
 
   def ids
     contact_ids = super
+    return [] unless virti_acl_contacts_module_allowed?
     return contact_ids unless virti_acl_restrict_contact_ids?
 
     Virti::Acl::ContactScope.new(
@@ -20,5 +21,9 @@ module Virti::Acl::Patches::ContactsBulkActionServicePatch
     return false if result.acl_source == 'default'
 
     result.permissions['pode_ver_aba_de_todas_conversas'] == false
+  end
+
+  def virti_acl_contacts_module_allowed?
+    Virti::Acl::ContactsModuleAccess.allowed?(user: @user, account: @account)
   end
 end

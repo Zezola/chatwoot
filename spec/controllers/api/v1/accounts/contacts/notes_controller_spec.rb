@@ -35,6 +35,16 @@ RSpec.describe 'Notes API', type: :request do
 
         expect(response).to have_http_status(:forbidden)
       end
+
+      it 'blocks access to contact notes when Virti contacts menu is disabled' do
+        disable_virti_contacts_menu_for(agent)
+
+        get "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/notes",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:forbidden)
+      end
     end
   end
 
@@ -150,5 +160,17 @@ RSpec.describe 'Notes API', type: :request do
       }
     )
     create(:virti_acl_user_model, account: account, user: user, model: model)
+  end
+
+  def disable_virti_contacts_menu_for(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: { 'pode_ver_menu_contatos' => false }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
+
+    permissions = Virti::Acl::PermissionsResolver.new(user: user, account: account).perform
+    expect(permissions['pode_ver_menu_contatos']).to be(false)
   end
 end
