@@ -63,7 +63,7 @@ RSpec.describe 'Contact Label API', type: :request do
         expect(response.body).to include('label4')
       end
 
-      it 'documents current label updates for contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when updating contact labels' do
         create_contact_outside_virti_acl_for(agent, contact)
 
         post api_v1_account_contact_labels_url(account_id: account.id, contact_id: contact.id),
@@ -71,8 +71,8 @@ RSpec.describe 'Contact Label API', type: :request do
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:success)
-        expect(contact.reload.label_list).to include('label3', 'label4')
+        expect(response).to have_http_status(:forbidden)
+        expect(contact.reload.label_list).not_to include('label3', 'label4')
       end
     end
   end

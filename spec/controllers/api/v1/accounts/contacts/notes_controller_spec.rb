@@ -26,15 +26,14 @@ RSpec.describe 'Notes API', type: :request do
         expect(body.first[:content]).to eq(note.content)
       end
 
-      it 'documents current access to notes for contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when listing contact notes' do
         create_contact_outside_virti_acl_for(agent, contact)
 
         get "/api/v1/accounts/#{account.id}/contacts/#{contact.id}/notes",
             headers: agent.create_new_auth_token,
             as: :json
 
-        expect(response).to have_http_status(:success)
-        expect(response.parsed_body.pluck('id')).to include(note.id)
+        expect(response).to have_http_status(:forbidden)
       end
     end
   end

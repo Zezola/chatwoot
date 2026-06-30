@@ -167,14 +167,14 @@ RSpec.describe Account::ContactsExportJob do
       expect(csv_data.length).to eq(8)
     end
 
-    it 'documents current export of contacts outside Virti ACL scope' do
+    it 'respects Virti ACL scope when exporting contacts' do
       hidden_contact = create(:contact, account: account, email: 'hidden-export-contact@example.com')
       create_contact_outside_virti_acl_for(user, hidden_contact)
 
       described_class.perform_now(account.id, user.id, %w[id email], {})
 
       csv_data = CSV.parse(account.contacts_export.download, headers: true)
-      expect(csv_data.pluck('email')).to include(hidden_contact.email)
+      expect(csv_data.pluck('email')).not_to include(hidden_contact.email)
     end
   end
 

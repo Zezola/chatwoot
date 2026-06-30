@@ -34,7 +34,7 @@ RSpec.describe Contacts::BulkActionService do
         service.perform
       end
 
-      it 'documents current label assignment to contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when assigning labels' do
         hidden_contact = create(:contact, account: account)
         create_contact_outside_virti_acl_for(user, hidden_contact)
 
@@ -44,7 +44,7 @@ RSpec.describe Contacts::BulkActionService do
           params: { ids: [hidden_contact.id], labels: { add: ['hidden_acl'] } }
         ).perform
 
-        expect(hidden_contact.reload.label_list).to include('hidden_acl')
+        expect(hidden_contact.reload.label_list).not_to include('hidden_acl')
       end
     end
   end

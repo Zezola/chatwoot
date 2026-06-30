@@ -163,7 +163,7 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response_body['payload'].pluck('email')).to include(contact_with_label1.email, contact_with_label2.email)
       end
 
-      it 'documents current listing of contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when listing contacts' do
         agent = create(:user, account: account, role: :agent)
         hidden_contact = create(:contact, :with_email, account: account)
         create_contact_outside_virti_acl_for(agent, hidden_contact)
@@ -173,7 +173,7 @@ RSpec.describe 'Contacts API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['payload'].pluck('id')).to include(hidden_contact.id)
+        expect(response.parsed_body['payload'].pluck('id')).not_to include(hidden_contact.id)
       end
     end
   end
@@ -350,7 +350,7 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response.body).not_to include(contact1.email)
       end
 
-      it 'documents current search of contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when searching contacts' do
         agent = create(:user, account: account, role: :agent)
         hidden_contact = create(:contact, :with_email, account: account, email: 'hidden-acl-contact@example.com')
         create_contact_outside_virti_acl_for(agent, hidden_contact)
@@ -361,7 +361,7 @@ RSpec.describe 'Contacts API', type: :request do
             as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['payload'].pluck('id')).to include(hidden_contact.id)
+        expect(response.parsed_body['payload'].pluck('id')).not_to include(hidden_contact.id)
       end
 
       it 'matches the contact ignoring the case in email' do
@@ -477,7 +477,7 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response.body).to include(contact1.email)
       end
 
-      it 'documents current filtering of contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when filtering contacts' do
         agent = create(:user, account: account, role: :agent)
         hidden_contact = create(
           :contact,
@@ -497,7 +497,7 @@ RSpec.describe 'Contacts API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:success)
-        expect(response.parsed_body['payload'].pluck('id')).to include(hidden_contact.id)
+        expect(response.parsed_body['payload'].pluck('id')).not_to include(hidden_contact.id)
       end
 
       it 'returns error the query operator is invalid' do
@@ -554,7 +554,7 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response.body).to include(contact.name)
       end
 
-      it 'documents current direct access to contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when showing a contact directly' do
         agent = create(:user, account: account, role: :agent)
         create_contact_outside_virti_acl_for(agent, contact)
 
@@ -562,8 +562,7 @@ RSpec.describe 'Contacts API', type: :request do
             headers: agent.create_new_auth_token,
             as: :json
 
-        expect(response).to have_http_status(:success)
-        expect(response.parsed_body.dig('payload', 'id')).to eq(contact.id)
+        expect(response).to have_http_status(:forbidden)
       end
     end
   end
@@ -771,8 +770,9 @@ RSpec.describe 'Contacts API', type: :request do
         expect(contact.reload.blocked).to be(false)
       end
 
-      it 'documents current update of contacts outside Virti ACL scope' do
+      it 'respects Virti ACL scope when updating a contact directly' do
         agent = create(:user, account: account, role: :agent)
+        original_name = contact.name
         create_contact_outside_virti_acl_for(agent, contact)
 
         patch "/api/v1/accounts/#{account.id}/contacts/#{contact.id}",
@@ -780,8 +780,8 @@ RSpec.describe 'Contacts API', type: :request do
               params: { name: 'Updated outside ACL' },
               as: :json
 
-        expect(response).to have_http_status(:success)
-        expect(contact.reload.name).to eq('Updated outside ACL')
+        expect(response).to have_http_status(:forbidden)
+        expect(contact.reload.name).to eq(original_name)
       end
     end
   end
