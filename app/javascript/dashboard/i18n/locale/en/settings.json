@@ -274,6 +274,13 @@
         "STEP_2": "Tap Add to Home Screen.",
         "STEP_3": "Open Chatwoot from the new shortcut on your Home Screen.",
         "STEP_4": "Allow notifications when Safari asks for permission."
+      },
+      "MODAL": {
+        "TITLE": "Your notifications are turned off",
+        "DESCRIPTION": "With notifications off you won't be alerted when a new conversation arrives or someone replies — you may miss important events and respond late. Turn them on to keep up with every conversation in real time and never leave a customer waiting.",
+        "ENABLE_ACTION": "Enable notifications",
+        "DISMISS_ACTION": "Not right now",
+        "DONT_ASK_AGAIN": "Don't ask again"
       }
     }
   },
