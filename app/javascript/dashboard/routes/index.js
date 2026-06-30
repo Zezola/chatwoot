@@ -4,6 +4,7 @@ import { frontendURL } from '../helper/URLHelper';
 import dashboard from './dashboard/dashboard.routes';
 import store from 'dashboard/store';
 import { validateLoggedInRoutes } from '../helper/routeHelpers';
+import { can } from 'dashboard/virti/acl/can';
 import { isOnOnboardingView } from 'v3/helpers/RouteHelper';
 import AnalyticsHelper from '../helper/AnalyticsHelper';
 
@@ -51,7 +52,20 @@ export const validateAuthenticateRoutePermission = async (to, next) => {
   }
 
   const nextRoute = validateLoggedInRoutes(to, store.getters.getCurrentUser);
-  return nextRoute ? next(frontendURL(nextRoute)) : next();
+  if (nextRoute) {
+    return next(frontendURL(nextRoute));
+  }
+
+  const virtiAclPermission = to.meta?.virtiAclPermission;
+  if (virtiAclPermission) {
+    await store.dispatch('acl/fetchAcl');
+    const userAcl = store.getters['acl/getUserACL'];
+    if (!can(userAcl, virtiAclPermission)) {
+      return next(frontendURL(`accounts/${routeAccountId}/dashboard`));
+    }
+  }
+
+  return next();
 };
 
 export const initalizeRouter = () => {

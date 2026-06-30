@@ -12,6 +12,7 @@ vi.mock('../store', () => ({
         id: null,
         accounts: [],
       },
+      'acl/getUserACL': {},
       'accounts/getAccount': () => ({}),
     },
     dispatch: vi.fn(() => Promise.resolve()),
@@ -22,7 +23,9 @@ describe('#validateAuthenticateRoutePermission', () => {
   let next;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     next = vi.fn(); // Mock the next function
+    store.getters['acl/getUserACL'] = {};
   });
 
   describe('when user is not logged in', () => {
@@ -102,6 +105,26 @@ describe('#validateAuthenticateRoutePermission', () => {
         await validateAuthenticateRoutePermission(to, next);
 
         expect(next).toHaveBeenCalledWith();
+      });
+    });
+
+    describe('when route is blocked by Virti ACL', () => {
+      it('should redirect to dashboard', async () => {
+        store.getters['acl/getUserACL'] = { pode_ver_menu_contatos: false };
+
+        const to = {
+          name: 'contacts_dashboard_index',
+          params: { accountId: 1 },
+          meta: {
+            permissions: ['agent'],
+            virtiAclPermission: 'sidebar.contacts',
+          },
+        };
+
+        await validateAuthenticateRoutePermission(to, next);
+
+        expect(store.dispatch).toHaveBeenCalledWith('acl/fetchAcl');
+        expect(next).toHaveBeenCalledWith('/app/accounts/1/dashboard');
       });
     });
   });
