@@ -62,6 +62,41 @@ RSpec.describe 'Contact Label API', type: :request do
         expect(response.body).to include('label3')
         expect(response.body).to include('label4')
       end
+
+      it 'respects Virti ACL scope when updating contact labels' do
+        create_contact_outside_virti_acl_for(agent, contact)
+
+        post api_v1_account_contact_labels_url(account_id: account.id, contact_id: contact.id),
+             params: { labels: %w[label3 label4] },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:forbidden)
+        expect(contact.reload.label_list).not_to include('label3', 'label4')
+      end
     end
+  end
+
+  def create_contact_outside_virti_acl_for(user, contact)
+    other_agent = create(:user, account: account, role: :agent)
+    inbox = create(:inbox, account: account)
+
+    create(:inbox_member, user: user, inbox: inbox)
+    create(:conversation, account: account, inbox: inbox, contact: contact, assignee: other_agent)
+    restrict_virti_acl_to_assigned_conversations(user)
+
+    expect(Virti::Acl::ContactPolicy.new(user: user, account: account, contact: contact).show?).to be(false)
+  end
+
+  def restrict_virti_acl_to_assigned_conversations(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: {
+        'pode_ver_aba_de_todas_conversas' => false,
+        'pode_ver_aba_de_nao_atribuidas' => false
+      }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
   end
 end

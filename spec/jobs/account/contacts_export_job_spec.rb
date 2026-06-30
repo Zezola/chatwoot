@@ -166,5 +166,38 @@ RSpec.describe Account::ContactsExportJob do
       # since there are only 8 contacts with 'looped' in email
       expect(csv_data.length).to eq(8)
     end
+
+    it 'respects Virti ACL scope when exporting contacts' do
+      hidden_contact = create(:contact, account: account, email: 'hidden-export-contact@example.com')
+      create_contact_outside_virti_acl_for(user, hidden_contact)
+
+      described_class.perform_now(account.id, user.id, %w[id email], {})
+
+      csv_data = CSV.parse(account.contacts_export.download, headers: true)
+      expect(csv_data.pluck('email')).not_to include(hidden_contact.email)
+    end
+  end
+
+  def create_contact_outside_virti_acl_for(user, contact)
+    other_agent = create(:user, account: account, role: :agent)
+    inbox = create(:inbox, account: account)
+
+    create(:inbox_member, user: user, inbox: inbox)
+    create(:conversation, account: account, inbox: inbox, contact: contact, assignee: other_agent)
+    restrict_virti_acl_to_assigned_conversations(user)
+
+    expect(Virti::Acl::ContactPolicy.new(user: user, account: account, contact: contact).show?).to be(false)
+  end
+
+  def restrict_virti_acl_to_assigned_conversations(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: {
+        'pode_ver_aba_de_todas_conversas' => false,
+        'pode_ver_aba_de_nao_atribuidas' => false
+      }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
   end
 end

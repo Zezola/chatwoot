@@ -162,6 +162,30 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response_body['meta']['count']).to eq(2)
         expect(response_body['payload'].pluck('email')).to include(contact_with_label1.email, contact_with_label2.email)
       end
+
+      it 'respects Virti ACL scope when listing contacts' do
+        agent = create(:user, account: account, role: :agent)
+        hidden_contact = create(:contact, :with_email, account: account)
+        create_contact_outside_virti_acl_for(agent, hidden_contact)
+
+        get "/api/v1/accounts/#{account.id}/contacts",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload'].pluck('id')).not_to include(hidden_contact.id)
+      end
+
+      it 'blocks listing contacts when Virti contacts menu is disabled' do
+        agent = create(:user, account: account, role: :agent)
+        disable_virti_contacts_menu_for(agent)
+
+        get "/api/v1/accounts/#{account.id}/contacts",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:forbidden)
+      end
     end
   end
 
@@ -337,6 +361,20 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response.body).not_to include(contact1.email)
       end
 
+      it 'respects Virti ACL scope when searching contacts' do
+        agent = create(:user, account: account, role: :agent)
+        hidden_contact = create(:contact, :with_email, account: account, email: 'hidden-acl-contact@example.com')
+        create_contact_outside_virti_acl_for(agent, hidden_contact)
+
+        get "/api/v1/accounts/#{account.id}/contacts/search",
+            params: { q: hidden_contact.email },
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload'].pluck('id')).not_to include(hidden_contact.id)
+      end
+
       it 'matches the contact ignoring the case in email' do
         get "/api/v1/accounts/#{account.id}/contacts/search",
             params: { q: 'Test@Test.com' },
@@ -450,6 +488,29 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response.body).to include(contact1.email)
       end
 
+      it 'respects Virti ACL scope when filtering contacts' do
+        agent = create(:user, account: account, role: :agent)
+        hidden_contact = create(
+          :contact,
+          :with_email,
+          account: account,
+          additional_attributes: { country_code: 'BR' }
+        )
+        create_contact_outside_virti_acl_for(agent, hidden_contact)
+
+        post "/api/v1/accounts/#{account.id}/contacts/filter",
+             params: { payload: [
+               attribute_key: 'country_code',
+               filter_operator: 'equal_to',
+               values: ['BR']
+             ] },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['payload'].pluck('id')).not_to include(hidden_contact.id)
+      end
+
       it 'returns error the query operator is invalid' do
         post "/api/v1/accounts/#{account.id}/contacts/filter",
              params: { payload: [
@@ -502,6 +563,28 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response).to have_http_status(:success)
         expect(response).to conform_schema(200)
         expect(response.body).to include(contact.name)
+      end
+
+      it 'respects Virti ACL scope when showing a contact directly' do
+        agent = create(:user, account: account, role: :agent)
+        create_contact_outside_virti_acl_for(agent, contact)
+
+        get "/api/v1/accounts/#{account.id}/contacts/#{contact.id}",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:forbidden)
+      end
+
+      it 'blocks direct access to contacts when Virti contacts menu is disabled' do
+        agent = create(:user, account: account, role: :agent)
+        disable_virti_contacts_menu_for(agent)
+
+        get "/api/v1/accounts/#{account.id}/contacts/#{contact.id}",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:forbidden)
       end
     end
   end
@@ -708,6 +791,20 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response).to have_http_status(:success)
         expect(contact.reload.blocked).to be(false)
       end
+
+      it 'respects Virti ACL scope when updating a contact directly' do
+        agent = create(:user, account: account, role: :agent)
+        original_name = contact.name
+        create_contact_outside_virti_acl_for(agent, contact)
+
+        patch "/api/v1/accounts/#{account.id}/contacts/#{contact.id}",
+              headers: agent.create_new_auth_token,
+              params: { name: 'Updated outside ACL' },
+              as: :json
+
+        expect(response).to have_http_status(:forbidden)
+        expect(contact.reload.name).to eq(original_name)
+      end
     end
   end
 
@@ -816,5 +913,40 @@ RSpec.describe 'Contacts API', type: :request do
         expect(response).to have_http_status(:success)
       end
     end
+  end
+
+  def create_contact_outside_virti_acl_for(user, contact)
+    other_agent = create(:user, account: account, role: :agent)
+    inbox = create(:inbox, account: account)
+
+    create(:inbox_member, user: user, inbox: inbox)
+    create(:conversation, account: account, inbox: inbox, contact: contact, assignee: other_agent)
+    restrict_virti_acl_to_assigned_conversations(user)
+
+    expect(Virti::Acl::ContactPolicy.new(user: user, account: account, contact: contact).show?).to be(false)
+  end
+
+  def restrict_virti_acl_to_assigned_conversations(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: {
+        'pode_ver_aba_de_todas_conversas' => false,
+        'pode_ver_aba_de_nao_atribuidas' => false
+      }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
+  end
+
+  def disable_virti_contacts_menu_for(user)
+    model = create(
+      :virti_acl_model,
+      account: account,
+      permissions: { 'pode_ver_menu_contatos' => false }
+    )
+    create(:virti_acl_user_model, account: account, user: user, model: model)
+
+    permissions = Virti::Acl::PermissionsResolver.new(user: user, account: account).perform
+    expect(permissions['pode_ver_menu_contatos']).to be(false)
   end
 end

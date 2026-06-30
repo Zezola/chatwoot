@@ -36,4 +36,21 @@ Rails.application.config.to_prepare do
 
   search_service_patch = Virti::Acl::Patches::SearchServicePatch
   prepend_once.call(SearchService, search_service_patch)
+
+  contacts_patch = Virti::Acl::Patches::ContactsControllerPatch
+  contacts_controller = Api::V1::Accounts::ContactsController
+  prepend_once.call(contacts_controller, contacts_patch)
+
+  contacts_base_patch = Virti::Acl::Patches::ContactsBaseControllerPatch
+  contacts_base_controller = Api::V1::Accounts::Contacts::BaseController
+  prepend_once.call(contacts_base_controller, contacts_base_patch)
+
+  contacts_filter_patch = Virti::Acl::Patches::ContactsFilterServicePatch
+  prepend_once.call(Contacts::FilterService, contacts_filter_patch)
+
+  contacts_export_patch = Virti::Acl::Patches::ContactsExportJobPatch
+  prepend_once.call(Account::ContactsExportJob, contacts_export_patch)
+
+  contacts_bulk_action_patch = Virti::Acl::Patches::ContactsBulkActionServicePatch
+  prepend_once.call(Contacts::BulkActionService, contacts_bulk_action_patch)
 end
