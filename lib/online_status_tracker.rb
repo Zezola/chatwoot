@@ -17,6 +17,11 @@ class OnlineStatusTracker
     connected_time && connected_time > (Time.zone.now - duration).to_i
   end
 
+  def self.get_last_presence(account_id, obj_type, obj_id)
+    connected_time = ::Redis::Alfred.zscore(presence_key(account_id, obj_type), obj_id)
+    Time.at(connected_time).utc.iso8601 if connected_time
+  end
+
   def self.presence_key(account_id, type)
     case type
     when 'Contact'
