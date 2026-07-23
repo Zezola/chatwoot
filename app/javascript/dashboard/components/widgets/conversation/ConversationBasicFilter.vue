@@ -70,7 +70,7 @@ const chatStatusOptions = computed(() => {
     },
   ];
 
-  if (props.activeAssigneeTab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+  if (props.activeAssigneeTab !== wootConstants.ASSIGNEE_TYPE.ALL) {
     return [
       {
         label: t('CHAT_LIST.CHAT_STATUS_FILTER_ITEMS.open_pending_snoozed.TEXT'),

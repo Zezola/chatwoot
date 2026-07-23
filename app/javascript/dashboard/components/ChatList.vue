@@ -75,7 +75,8 @@ const resolveAttributesModalRef = ref(null);
 
 const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
 const statusByAssigneeType = ref({
-  [wootConstants.ASSIGNEE_TYPE.ME]: wootConstants.STATUS_TYPE.ALL,
+  [wootConstants.ASSIGNEE_TYPE.ME]:
+    wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED,
   [wootConstants.ASSIGNEE_TYPE.ALL]: wootConstants.STATUS_TYPE.ALL,
   [wootConstants.ASSIGNEE_TYPE.UNASSIGNED]:
     wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED,
@@ -406,9 +407,9 @@ const statusByAssigneeTypeForRequest = computed(() => {
 
 // ---------------------- Methods -----------------------
 function defaultStatusForAssigneeTab(assigneeTab) {
-  return assigneeTab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED
-    ? wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED
-    : wootConstants.STATUS_TYPE.ALL;
+  return assigneeTab === wootConstants.ASSIGNEE_TYPE.ALL
+    ? wootConstants.STATUS_TYPE.ALL
+    : wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED;
 }
 
 function statusForRequest(status) {
@@ -418,13 +419,13 @@ function statusForRequest(status) {
 }
 
 function normalizedStatusForAssigneeTab(status, assigneeTab) {
-  if (assigneeTab === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
-    return status || wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED;
+  if (assigneeTab === wootConstants.ASSIGNEE_TYPE.ALL) {
+    return status === wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED || !status
+      ? wootConstants.STATUS_TYPE.ALL
+      : status;
   }
 
-  return status === wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED || !status
-    ? wootConstants.STATUS_TYPE.ALL
-    : status;
+  return status || wootConstants.STATUS_TYPE.OPEN_PENDING_SNOOZED;
 }
 
 function normalizedStatusByAssigneeType(savedStatuses = {}) {
