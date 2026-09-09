@@ -58,7 +58,7 @@ export const actions = {
     }
   },
   async fullSearch({ commit, dispatch }, payload) {
-    const { q, ...filters } = payload;
+    const { q, includeContacts = true, ...filters } = payload;
     if (!q && !Object.keys(filters).length) {
       return;
     }
@@ -67,12 +67,17 @@ export const actions = {
       isSearchCompleted: false,
     });
     try {
-      await Promise.all([
-        dispatch('contactSearch', { q, ...filters }),
+      const searchActions = [
         dispatch('conversationSearch', { q, ...filters }),
         dispatch('messageSearch', { q, ...filters }),
         dispatch('articleSearch', { q, ...filters }),
-      ]);
+      ];
+
+      if (includeContacts) {
+        searchActions.push(dispatch('contactSearch', { q, ...filters }));
+      }
+
+      await Promise.all(searchActions);
     } catch (error) {
       // Ignore error
     } finally {

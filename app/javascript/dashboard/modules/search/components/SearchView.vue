@@ -15,6 +15,7 @@ import {
 import { usePolicy } from 'dashboard/composables/usePolicy';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
+import { can } from 'dashboard/virti/acl/can';
 
 import Policy from 'dashboard/components/policy.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -47,6 +48,11 @@ const conversationRecords = useMapGetter(
 const messageRecords = useMapGetter('conversationSearch/getMessageRecords');
 const articleRecords = useMapGetter('conversationSearch/getArticleRecords');
 const uiFlags = useMapGetter('conversationSearch/getUIFlags');
+const userACL = useMapGetter('acl/getUserACL');
+
+const canSearchContacts = computed(() =>
+  can(userACL.value, 'sidebar.contacts')
+);
 
 const addTypeToRecords = (records, type) =>
   records.value.map(item => ({ ...useCamelCase(item, { deep: true }), type }));
@@ -101,6 +107,7 @@ const TABS_CONFIG = {
   },
   contacts: {
     permissions: [...ROLES, CONTACT_PERMISSIONS],
+    virtiAclPermission: 'sidebar.contacts',
     count: () => mappedContacts.value.length,
   },
   conversations: {
@@ -127,6 +134,7 @@ const tabs = computed(() => {
       showBadge: key !== 'all',
       permissions: config.permissions,
       featureFlag: config.featureFlag,
+      virtiAclPermission: config.virtiAclPermission,
     }))
     .filter(config => {
       // why the double check, glad you asked.
@@ -135,6 +143,8 @@ const tabs = computed(() => {
       // this works for pages and routes, but fails for UI elements like search here
       // so we explicitly check if the feature is enabled
       return (
+        (!config.virtiAclPermission ||
+          can(userACL.value, config.virtiAclPermission)) &&
         shouldShow(config.featureFlag, config.permissions, null) &&
         isFeatureFlagEnabled(config.featureFlag)
       );
@@ -145,6 +155,7 @@ const totalSearchResultsCount = computed(() => {
   const permissionCounts = [
     {
       permissions: [...ROLES, CONTACT_PERMISSIONS],
+      virtiAclPermission: 'sidebar.contacts',
       count: () => contacts.value.length,
     },
     {
@@ -166,6 +177,8 @@ const totalSearchResultsCount = computed(() => {
       // this works for pages and routes, but fails for UI elements like search here
       // so we explicitly check if the feature is enabled
       return (
+        (!config.virtiAclPermission ||
+          can(userACL.value, config.virtiAclPermission)) &&
         shouldShow(config.featureFlag, config.permissions, null) &&
         isFeatureFlagEnabled(config.featureFlag)
       );
@@ -292,7 +305,11 @@ const onSearch = q => {
   if (!q) return;
   useTrack(CONVERSATION_EVENTS.SEARCH_CONVERSATION);
 
-  const searchPayload = buildSearchPayload({ q, page: 1 });
+  const searchPayload = buildSearchPayload({
+    q,
+    page: 1,
+    includeContacts: canSearchContacts.value,
+  });
   store.dispatch('conversationSearch/fullSearch', searchPayload);
 };
 
@@ -335,15 +352,21 @@ const onTabChange = tab => {
   updateURL();
 };
 
-onMounted(() => {
+onMounted(async () => {
   store.dispatch('conversationSearch/clearSearchResults');
   store.dispatch('agents/get');
+  await store.dispatch('acl/fetchAcl');
 
   const parsedFilters = parseURLParams(
     route.query,
     isFeatureFlagEnabled(FEATURE_FLAGS.ADVANCED_SEARCH)
   );
   filters.value = parsedFilters;
+
+  if (selectedTab.value === 'contacts' && !canSearchContacts.value) {
+    selectedTab.value = 'all';
+    updateURL();
+  }
 
   // Auto-execute search if query parameter exists
   if (route.query.q) {
@@ -390,6 +413,7 @@ onUnmounted(() => {
         <div class="w-full max-w-5xl mx-auto px-4 pb-6">
           <div v-if="showResultsSection">
             <Policy
+              v-if="canSearchContacts"
               :permissions="[...ROLES, CONTACT_PERMISSIONS]"
               class="flex flex-col justify-center"
             >

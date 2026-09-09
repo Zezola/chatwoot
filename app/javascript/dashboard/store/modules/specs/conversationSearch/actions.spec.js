@@ -87,6 +87,20 @@ describe('#actions', () => {
       expect(dispatch).toHaveBeenCalledWith('messageSearch', payload);
       expect(dispatch).toHaveBeenCalledWith('articleSearch', payload);
     });
+
+    it('should skip contact search when contacts are disabled by ACL', async () => {
+      await actions.fullSearch(
+        { commit, dispatch },
+        { q: 'test', includeContacts: false }
+      );
+
+      expect(dispatch).not.toHaveBeenCalledWith('contactSearch', { q: 'test' });
+      expect(dispatch).toHaveBeenCalledWith('conversationSearch', {
+        q: 'test',
+      });
+      expect(dispatch).toHaveBeenCalledWith('messageSearch', { q: 'test' });
+      expect(dispatch).toHaveBeenCalledWith('articleSearch', { q: 'test' });
+    });
   });
 
   describe('#contactSearch', () => {
